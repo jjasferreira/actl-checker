@@ -26,13 +26,13 @@ class Trace:
 
 
 
-class Expr(ABC):
+class Formula(ABC):
     @abstractmethod
     def evaluate(self, store) -> Any:
         pass
 
 
-class Var(Expr):
+class Var(Formula):
     def __init__(self, label):
         self.label = label
 
@@ -44,7 +44,7 @@ class Var(Expr):
     def __repr__(self):
         return f"VarLabel:{self.label}"
 
-# class VarValue(Expr):
+# class VarValue(Formula):
 #     def __init__(self, label, value):
 #         self.label = label
 #         self.value = value
@@ -56,7 +56,7 @@ class Var(Expr):
 #         return f"Var:{self.label}"
 
 
-class IntervalValue(Expr):
+class IntervalValue(Formula):
     #TODO: explicit types in init, int or datetime
     def __init__(self, start, end): 
         self.start = start
@@ -89,7 +89,7 @@ class Interval(Var):
         return f"Var:{self.label}"
 
 
-class Not(Expr):
+class Not(Formula):
     def __init__(self, expr):
         self.expr = expr
 
@@ -99,7 +99,7 @@ class Not(Expr):
     def __repr__(self):
         return f"~({self.expr})"
 
-class BinaryExpr(Expr, ABC):
+class BinaryExpr(Formula, ABC):
     @abstractmethod
     def __init__(self, left, right):
         self.left = left
@@ -149,7 +149,7 @@ class Implies(BinaryExpr):
         return f"({self.left} => {self.right})"
 
 
-class Quantifier(Expr, ABC):
+class Quantifier(Formula, ABC):
     def __init__(self, var : list, expr):
         self.var = var # list of vars instead?
         self.expr = expr
@@ -201,7 +201,7 @@ class ActionType(Enum):
     Member = 10
     Responsible = 11
 
-class Action(Expr):
+class Action(Formula):
     def __init__(self, action_type: ActionType, inputs, interval, outputs):
         self.action_type = action_type
         self.input = inputs if isinstance(inputs, list) else [inputs]
@@ -218,7 +218,7 @@ class Action(Expr):
         return f"{self.action_type}({inputs_str}) [{self.interval}] -> ({self.output})"
 
 
-class IntervalPredicate(Expr, ABC):
+class IntervalPredicate(Formula, ABC):
     @abstractmethod
     def __init__(self, left : Interval, right : Interval):
         self.left = left
