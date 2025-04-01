@@ -2,24 +2,49 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
 
-# TODO: Events
-#
-# class Event(ABC):
-#     pass
-#
-# class Begin(Event):
-#
-# class End(Event):
+
+class ActionType(Enum):
+    Lookup = 1
+    Store = 2
+    FindNode = 3
+    Join = 4
+    Leave = 5
+    Fail = 6
+    Ideal = 7
+    Stable = 8
+    ReadOnly = 9
+    Member = 10
+    Responsible = 11
+    
+class Event(ABC):
+    @abstractmethod
+    def __init__(self, action_type : ActionType, values):
+        self.action_type = action_type
+        self.values = values if isinstance(values, list) else [values]
+
+class Begin(Event):
+    def __init__(self, action_type : ActionType, values):
+        super().__init__(action_type, values)
+
+    def __repr__(self):
+        return f"Begin({self.action_type}, {self.values})"
+
+class End(Event):
+    def __init__(self, action_type : ActionType, values):
+        super().__init__(action_type, values)
+
+    def __repr__(self):
+        return f"End({self.action_type}, {self.values})"
 
 class Trace:
-    def __init__(self, trace = None):
+    def __init__(self, trace : list[Event] = []):
         if trace:
             self.trace = trace
         else:
             self.trace = []
 
-    def add(self, expr):
-        self.trace.append(expr)
+    def add(self, event : Event):
+        self.trace.append(event)
 
     def __repr__(self):
         return f"Trace({self.trace})"
@@ -196,18 +221,6 @@ class ForAll(Quantifier):
 
 
 
-class ActionType(Enum):
-    Lookup = 1
-    Store = 2
-    FindNode = 3
-    Join = 4
-    Leave = 5
-    Fail = 6
-    Ideal = 7
-    Stable = 8
-    ReadOnly = 9
-    Member = 10
-    Responsible = 11
 
 class Action(Formula):
     def __init__(self, action_type: ActionType, interval, inputs, outputs):
