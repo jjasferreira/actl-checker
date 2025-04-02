@@ -1,10 +1,10 @@
 from lark import Lark, Transformer
-from ast_nodes import  *
+from ast_nodes import *
 
 grammar = r"""
     ?start: expr
     ?expr: action
-         | equals
+         | equal
          | not_
          | and_
          | or_
@@ -13,16 +13,21 @@ grammar = r"""
          | exists
          | relation
          | "(" expr+ ")"
-    ?action: "(" var var "(" var* ")" "(" var* "))"
-    ?equals: "(" "equals" var var ")"
+
+    ?action: "(" var var anyvars anyvars ")"
+    ?equal: "(" "equal" var var ")"
     ?not_: "(" "not" expr ")"
     ?and_: "(" "and" expr expr ")"
     ?or_: "(" "or" expr expr ")"
     ?implies: "(" "implies" expr expr ")"
-    ?forall: "(" "forall" "(" var+ ")" expr ")"
-    ?exists: "(" "exists" "(" var+ ")" expr ")"
+    ?forall: "(" "forall" somevars expr ")"
+    ?exists: "(" "exists" somevars expr ")"
     ?relation: "(" var var var ")"
+
     ?var: CNAME
+    ?anyvars: "(" var* ")" 
+    ?somevars: "(" var+ ")" 
+
     %import common.CNAME
     %import common.WS
     %ignore WS
@@ -34,8 +39,8 @@ class Transformer(Transformer):
     def action(self, items):
         return Action(ActionType[items[0].capitalize()], items[1], items[2], items[3])
 
-    def equals(self, items):
-        return Equals(items[0], items[1])
+    def equal(self, items):
+        return Equal(items[0], items[1])
     
     def not_(self, items):
         return Not(items[0])
@@ -74,13 +79,18 @@ class Transformer(Transformer):
             raise ValueError(f"Unknown relation {items[0]}")
 
     def var(self, items):
-        return items[0]
+        return Var(items[0])
+    
+    def anyvars(self, items):
+        return [item.value for item in items]
 
+    def somevars(self, items):
+        return [item.value for item in items]
 
 
 # Testing
 
-input1 = """
+input = """
 (forall (i x y)
   (implies
     (lookup i (x) (y))
@@ -93,4 +103,8 @@ input1 = """
   )
 )"""
 
-print(Transformer().transform(parser.parse(input1)))
+output1 = parser.parse(input)
+print(output1)
+
+output2 = Transformer().transform(output1)
+print(output2)

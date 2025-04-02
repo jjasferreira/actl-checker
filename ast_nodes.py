@@ -32,6 +32,7 @@ class Formula(ABC):
         pass
 
 
+
 class Var(Formula):
     def __init__(self, label):
         self.label = label
@@ -42,7 +43,7 @@ class Var(Formula):
         return store[self.label]
 
     def __repr__(self):
-        return f"VarLabel:{self.label}"
+        return f"{self.label}"
 
 # class VarValue(Formula):
 #     def __init__(self, label, value):
@@ -56,10 +57,11 @@ class Var(Formula):
 #         return f"Var:{self.label}"
 
 
+
 class IntervalValue(Formula):
     #TODO: explicit types in init, int or datetime
-    def __init__(self, start, end): 
-        self.start = start
+    def __init__(self, begin, end): 
+        self.begin = begin
         self.end = end
     
     def evaluate(self, _): #type: ignore
@@ -68,43 +70,49 @@ class IntervalValue(Formula):
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, IntervalValue)
-            and self.start == other.start
+            and self.begin == other.begin
             and self.end == other.end
         )
 
-
     def __repr__(self):
-        return f"Interval[{self.start}, {self.end}]"
-
-
+        return f"({self.begin}, {self.end})"
 
 class Interval(Var):
     def __init__(self, label):
         self.label = label
 
     def evaluate(self, store) -> IntervalValue:
+        if self.label not in store:
+            raise ValueError(f"Interval {self.label} not found in store")
         return store[self.label]
 
     def __repr__(self):
-        return f"Var:{self.label}"
+        return f"{self.label}"
 
 
-class Not(Formula):
+
+class UnaryExpr(Formula, ABC):
+    @abstractmethod
     def __init__(self, expr):
         self.expr = expr
+
+class Not(UnaryExpr):
+    def __init__(self, expr):
+        super().__init__(expr)
 
     def evaluate(self, store):
         return not self.expr.evaluate(store)
 
     def __repr__(self):
-        return f"~({self.expr})"
+        return f"¬({self.expr})"
+
+
 
 class BinaryExpr(Formula, ABC):
     @abstractmethod
     def __init__(self, left, right):
         self.left = left
         self.right = right
-
 
 class Equal(BinaryExpr):
     def __init__(self, left, right):
@@ -119,13 +127,12 @@ class Equal(BinaryExpr):
 class And(BinaryExpr):
     def __init__(self, left, right):
         super().__init__(left, right)
-
     
     def evaluate(self, store) -> Any:
         return self.left.evaluate(store) and self.right.evaluate(store)
 
     def __repr__(self):
-        return f"({self.left} && {self.right})"
+        return f"({self.left} ∧ {self.right})"
 
 class Or(BinaryExpr):
     def __init__(self, left, right):
@@ -135,8 +142,7 @@ class Or(BinaryExpr):
         return self.left.evaluate(store) or self.right.evaluate(store)
 
     def __repr__(self):
-        return f"({self.left} || {self.right})"
-
+        return f"({self.left} v {self.right})"
 
 class Implies(BinaryExpr):
     def __init__(self, left, right):
@@ -149,12 +155,12 @@ class Implies(BinaryExpr):
         return f"({self.left} => {self.right})"
 
 
+
 class Quantifier(Formula, ABC):
-    def __init__(self, var : list, expr):
-        self.var = var # list of vars instead?
+    @abstractmethod
+    def __init__(self, var, expr):
+        self.var = var if isinstance(var, list) else [var]
         self.expr = expr
-
-
 
 class Exists(Quantifier):
     def __init__(self, var, expr):
@@ -173,7 +179,8 @@ class Exists(Quantifier):
     #     return False
 
     def __repr__(self):
-        return f"E{self.var}. ({self.expr})"
+        var_str = ", ".join(map(str, self.var))
+        return f"∃({var_str}). ({self.expr})"
 
 class ForAll(Quantifier):
     def __init__(self, var, expr):
@@ -184,7 +191,8 @@ class ForAll(Quantifier):
         raise NotImplementedError
 
     def __repr__(self):
-        return f"V{self.var}. ({self.expr})"
+        var_str = ", ".join(map(str, self.var))
+        return f"∀({var_str}). ({self.expr})"
 
 
 
@@ -202,20 +210,22 @@ class ActionType(Enum):
     Responsible = 11
 
 class Action(Formula):
-    def __init__(self, action_type: ActionType, inputs, interval, outputs):
+    def __init__(self, action_type: ActionType, interval, inputs, outputs):
         self.action_type = action_type
-        self.input = inputs if isinstance(inputs, list) else [inputs]
         self.interval = interval
+        self.input = inputs if isinstance(inputs, list) else [inputs]
         self.output = outputs if isinstance(outputs, list) else [outputs]
-
 
     # TODO: evaluate, search the whole trace for a matching action
     def evaluate(self, _) -> Any: # type: ignore
         raise NotImplementedError
 
     def __repr__(self):
-        inputs_str = ", ".join(map(str, self.input))
-        return f"{self.action_type}({inputs_str}) [{self.interval}] -> ({self.output})"
+        type_str = self.action_type.name.lower()
+        input_str = ", ".join(map(str, self.input))
+        output_str = ", ".join(map(str, self.output))
+        return f"{type_str}[{self.interval}] ({input_str}) -> ({output_str})"
+
 
 
 class IntervalPredicate(Formula, ABC):
@@ -224,44 +234,6 @@ class IntervalPredicate(Formula, ABC):
         self.left = left
         self.right = right
 
-class During(IntervalPredicate):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-
-    def evaluate(self, store) -> Any: # type: ignore
-        left = self.left.evaluate(store)
-        right = self.right.evaluate(store)
-
-        return right.start < left.start and left.end < right.end
-
-    def __repr__(self):
-        return f"During({self.left}, {self.right})"
-
-class Starts(IntervalPredicate):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-
-    def evaluate(self, store) -> Any: # type: ignore
-        left = self.left.evaluate(store)
-        right = self.right.evaluate(store)
-        return left.start == right.start and left.end < right.end
-
-    def __repr__(self):
-        return f"Starts({self.left}, {self.right})"
-
-
-class Finishes(IntervalPredicate):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-
-    def evaluate(self, store) -> Any: # type: ignore
-        left = self.left.evaluate(store)
-        right = self.right.evaluate(store)
-        return left.end == right.end and right.start < left.start
-
-    def __repr__(self):
-        return f"Finishes({self.left}, {self.right})"
-
 class Before(IntervalPredicate):
     def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
@@ -269,22 +241,10 @@ class Before(IntervalPredicate):
     def evaluate(self, store) -> Any: # type: ignore
         left = self.left.evaluate(store)
         right = self.right.evaluate(store)
-        return left.end < right.start # Ignores gap in ATL definition
+        return left.end < right.begin
 
     def __repr__(self):
         return f"Before({self.left}, {self.right})"
-
-class Overlap(IntervalPredicate):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-
-    def evaluate(self, store) -> Any: # type: ignore
-        left = self.left.evaluate(store)
-        right = self.right.evaluate(store)
-        return left.start < right.start < left.end < right.end
-
-    def __repr__(self):
-        return f"Overlap({self.left}, {self.right})"
 
 class Meets(IntervalPredicate):
     def __init__(self, left, right):
@@ -293,10 +253,58 @@ class Meets(IntervalPredicate):
     def evaluate(self, store) -> Any: # type: ignore
         left = self.left.evaluate(store)
         right = self.right.evaluate(store)
-        return left.end < right.start # Ignores gap in ATL definition
+        return left.end == right.begin
 
     def __repr__(self):
         return f"Meets({self.left}, {self.right})"
+
+class Overlaps(IntervalPredicate):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+
+    def evaluate(self, store) -> Any: # type: ignore
+        left = self.left.evaluate(store)
+        right = self.right.evaluate(store)
+        return left.begin < right.begin < left.end < right.end
+
+    def __repr__(self):
+        return f"Overlaps({self.left}, {self.right})"
+
+class Starts(IntervalPredicate):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+
+    def evaluate(self, store) -> Any: # type: ignore
+        left = self.left.evaluate(store)
+        right = self.right.evaluate(store)
+        return left.begin == right.begin and left.end < right.end
+
+    def __repr__(self):
+        return f"Starts({self.left}, {self.right})"
+
+class During(IntervalPredicate):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+
+    def evaluate(self, store) -> Any: # type: ignore
+        left = self.left.evaluate(store)
+        right = self.right.evaluate(store)
+        return right.begin < left.begin and left.end < right.end
+
+    def __repr__(self):
+        return f"During({self.left}, {self.right})"
+
+class Finishes(IntervalPredicate):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+
+    def evaluate(self, store) -> Any: # type: ignore
+        left = self.left.evaluate(store)
+        right = self.right.evaluate(store)
+        return left.end == right.end and right.begin < left.begin
+
+    def __repr__(self):
+        return f"Finishes({self.left}, {self.right})"
 
 class Equals(IntervalPredicate):
     def __init__(self, left, right):
@@ -310,16 +318,18 @@ class Equals(IntervalPredicate):
     def __repr__(self):
         return f"Equals({self.left}, {self.right})"
 
+
+
 if __name__ == "__main__":
-    action1 = Action(ActionType.Lookup, ["x1", "x2"], "[0, 5]", "y1")
-    action2 = Action(ActionType.Store, "x3", "[5, 10]", "y2")
+    action1 = Action(ActionType.Lookup, "i1", ["x1", "x2"], "y1")
+    action2 = Action(ActionType.Store, "i2", "x3", "y2")
 
     expr1 = And(action1, action2)
     expr2 = Not(Or(action1, action2))
 
     test = """ 
-action1 = Action(ActionType.Lookup, ["x1", "x2"], "[0, 5]", "y1")
-action2 = Action(ActionType.Store, "x3", "[5, 10]", "y2")
+action1 = Action(ActionType.Lookup, "i1", ["x1", "x2"], "y1")
+action2 = Action(ActionType.Store, "i2", "x3", "y2")
 
 expr1 = And(action1, action2)
 expr2 = Not(Or(action1, action2))
@@ -330,17 +340,17 @@ expr2 = Not(Or(action1, action2))
     print(expr2)
 
 
-    expr3 = ForAll(["x", "y", "z1"],\
+    expr3 = ForAll(["i1", "x", "y"],\
                     Implies( \
-                        Action(ActionType.FindNode, "x", "z1", "y"),  \
-                            Exists(["z2"],  \
-                                And(Action(ActionType.Member, [], "z2", []), During(Interval("z1"), Interval("z2"))))))
+                        Action(ActionType.FindNode, "i1", "x", "y"),  \
+                            Exists(["i2"],  \
+                                And(Action(ActionType.Member, "i2", [], []), During(Interval("i1"), Interval("i2"))))))
     test3 = '''
-ForAll(["x", "y", "z1", 
-                Implies( 
-                    Action(ActionType.FindNode, "x", "z1", "y"),  
-                        Exists("z2",  
-                            And(Action(ActionType.Member, [] "z2", []), During("z1", "z2")))))
+ForAll(["i1", "x", "y"],
+                Implies( \
+                    Action(ActionType.FindNode, "i1", "x", "y"),
+                        Exists("i2",
+                            And(Action(ActionType.Member, "i2", [], []), During("i1", "i2")))))
 '''
     print("-"*10)
     print(test3)
@@ -367,9 +377,9 @@ ForAll(["x", "y", "z1",
     store = {
         "x": True,
         "y": False,
-        "z1": IntervalValue(1, 5),
-        "z2": IntervalValue(0, 10),
-        "z3": IntervalValue(6, 15),
+        "i1": IntervalValue(1, 5),
+        "i2": IntervalValue(0, 10),
+        "i3": IntervalValue(6, 15),
     }
 
     exprs = [And(Var("x"), Var("y")),
@@ -381,9 +391,9 @@ ForAll(["x", "y", "z1",
         Equal(Var("x"), Var("x")),
         Equal(Var("x"), Var("y")) ,
 
-        During(Interval("z1"), Interval("z2")),
-        Before(Interval("z1"), Interval("z3")) ,
-        Meets(Interval("z1"), Interval("z3")) 
+        During(Interval("i1"), Interval("i2")),
+        Before(Interval("i1"), Interval("i3")) ,
+        Meets(Interval("i1"), Interval("i3")) 
     ]
 
 
@@ -391,5 +401,3 @@ ForAll(["x", "y", "z1",
     for expr in exprs:
         print(expr)
         print(expr.evaluate(store))
-
-
