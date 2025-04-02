@@ -65,7 +65,6 @@ class Trace:
         else:
             return None
 
-
     def __repr__(self):
         return f"Trace({self.trace})"
 
@@ -255,8 +254,39 @@ class Action(Formula):
     def evaluate(self, 
                  trace : Trace,
                  var_store : dict[str, str],
-                 interval_store : dict[str, IntervalValue]) -> Any:
-        pass
+                 interval_store : dict[str, IntervalValue]) -> Any: # type: ignore
+
+        action_interval = self.interval.evaluate(trace, var_store, interval_store)
+
+        bound_input = [x.evaluate(trace, var_store, interval_store) for x in self.input]
+        bound_output = [x.evaluate(trace, var_store, interval_store) for x in self.output]
+
+        begin_event = BeginEvent(self.action_type, bound_input, None)
+        end_event = EndEvent(self.action_type, bound_output, None)
+
+        completed_begin_event = trace.complete_event(begin_event, action_interval.begin)
+
+        # print(f"{evaluated_interval = }")
+        # print(f"{evaluated_input = }")
+        # print(f"{evaluated_output = }")
+        # print(f"{ev_b = }")
+        # print(f"{ev_e = }")
+        # print(f"{new_event_b = }")
+
+        if completed_begin_event is None:
+            return False
+
+        # TODO: 
+        # Deal with infinite intervals
+        # end_event is not None iff t2 = "inf"
+        # if t2 = "inf" then no end event should match its id
+        # if evaluated_interval.end is not None:
+
+        completed_end_event = trace.complete_event(end_event, action_interval.end)
+
+        # print(f"{new_event_e = }")
+
+        return (completed_end_event is not None) and completed_end_event.id == completed_begin_event.id
 
     def __repr__(self):
         type_str = self.action_type.name.lower()
