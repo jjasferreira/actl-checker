@@ -217,41 +217,105 @@ class Implies(BinaryExpr):
 
 class Quantifier(Formula, ABC):
     @abstractmethod
-    def __init__(self, var, expr):
-        self.var = var if isinstance(var, list) else [var]
+    def __init__(self, vars, expr):
+        self.vars = vars if isinstance(vars, list) else [vars]
         self.expr = expr
 
 class Exists(Quantifier):
-    def __init__(self, var, expr):
-        super().__init__(var, expr)
+    def __init__(self, vars, expr):
+        super().__init__(vars, expr)
     
-    # TODO: evaluate
-    def evaluate(self, _) -> Any:
-        raise NotImplementedError
-    
-    # TODO:
-    # def evaluate(self, trace : Trace, store, interval_store): 
-    #     for value in valores possiveis do traço, distinguir entre intervalos e restantes variaveis
-    #         new_store = store.copy()
-    #         new_store[self.var] = value  
-    #         if self.expr.evaluate(new_store):
-    #             return True
-    #     return False
+    # TODO: Generalise evaluation function to avoid code duplication
+    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
+        return self.naive_aux(trace, var_store, interval_store, 0)
+
+    def naive_aux(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
+            var_idx : int) -> bool:
+        if var_idx >= len(self.vars):
+
+            result =  self.expr.evaluate(trace, var_store, interval_store)
+            # print(f"Base case Evaluating: {self.expr} with {var_store} -> {result}")
+            return result
+
+        else:
+
+            #TODO: check if var is not bounded in current store?
+            var = self.vars[var_idx]
+            if isinstance(var, Var):
+                for value in var_store.values():
+                    new_store = var_store.copy()
+                    new_store[var.label] = value
+
+                    result = self.naive_aux(trace, new_store, interval_store, var_idx + 1)
+                    # print(f"Recursive case Evaluating {var_idx = }, {var = }, { value = }: {self.expr} with {var_store} -> {result}")
+                    if result:
+                        return True
+                else:
+
+                    # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store} -> {True}")
+                    return False
+            else: 
+                assert isinstance(var, Interval), f"Unexpected quantifiable type: {type(var)}"
+                
+                raise NotImplementedError("Interval quantification not implemented")
 
     def __repr__(self):
-        var_str = ", ".join(map(str, self.var))
+        var_str = ", ".join(map(str, self.vars))
         return f"∃({var_str}). ({self.expr})"
 
 class ForAll(Quantifier):
-    def __init__(self, var, expr):
-        super().__init__(var, expr)
 
-    # TODO: evaluate
-    def evaluate(self, _) -> Any:
-        raise NotImplementedError
+    # TODO: add types to the quantifier
+
+    def __init__(self, vars, expr):
+        super().__init__(vars, expr)
+
+    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
+        return self.naive_aux(trace, var_store, interval_store, 0)
+
+
+    def naive_aux(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
+            var_idx : int) -> bool:
+        if var_idx >= len(self.vars):
+
+            result =  self.expr.evaluate(trace, var_store, interval_store)
+            # print(f"Base case Evaluating: {self.expr} with {var_store} -> {result}")
+            return result
+
+        else:
+
+            #TODO: check if var is not bounded in current store?
+            var = self.vars[var_idx]
+            if isinstance(var, Var):
+                for value in var_store.values():
+                    new_store = var_store.copy()
+                    new_store[var.label] = value
+
+                    result = self.naive_aux(trace, new_store, interval_store, var_idx + 1)
+                    # print(f"Recursive case Evaluating {var_idx = }, {var = }, { value = }: {self.expr} with {var_store} -> {result}")
+                    if not result:
+                        return False
+                else:
+
+                    # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store} -> {True}")
+                    return True
+            else: 
+                assert isinstance(var, Interval), f"Unexpected quantifiable type: {type(var)}"
+                
+                raise NotImplementedError("Interval quantification not implemented")
+
 
     def __repr__(self):
-        var_str = ", ".join(map(str, self.var))
+        var_str = ", ".join(map(str, self.vars))
+
+
+        # TEST: remove
+        # for temporary debugging
+        # print("\nForall")
+        # for v in self.var:
+        #     print(f"var: {type(v)} {v = }")
+
+
         return f"∀({var_str}). ({self.expr})"
 
 
@@ -267,7 +331,6 @@ class Action(Formula):
     def evaluate(self, 
                  trace : Trace,
                  var_store : dict[str, str],
-                 interval_store : dict[str, IntervalValue]) -> Any: # type: ignore
                  interval_store : dict[str, IntervalValue]) -> Any:
 
         action_interval = self.interval.evaluate(trace, var_store, interval_store)
@@ -308,6 +371,18 @@ class Action(Formula):
         type_str = self.action_type.name.lower()
         input_str = ", ".join(map(str, self.input))
         output_str = ", ".join(map(str, self.output))
+
+        # HACK: remove
+        # for temporary debugging
+        # print("\nAction")
+        # print(f"Interval: {type(self.interval)} {self.interval = }") 
+        # print(f"input: {type(self.input)} {self.input = }")
+        # for inp in self.input:
+        #     print(f"input: {type(inp)} {inp = }")
+        # print(f"output: {type(self.output)} {self.output = }")
+        # for out in self.output:
+        #     print(f"output: {type(out)} {out = }")
+
         return f"{type_str}[{self.interval}] ({input_str}) -> ({output_str})"
 
 
