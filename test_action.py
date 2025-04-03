@@ -15,8 +15,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 1)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.push(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
+        trace.append(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
 
         # print(f"{trace = }")
         # print(f"{eval_store = }")
@@ -42,8 +42,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.push(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
+        trace.append(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -60,8 +60,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Lookup,["node_banana", "key0"], "id1"))
-        trace.push(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append(BeginEvent(ActionType.Lookup,["node_banana", "key0"], "id1"))
+        trace.append(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -79,8 +79,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.push(EndEvent(ActionType.Lookup, ["node_kiwi", "value0"], "id1"))
+        trace.append(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
+        trace.append(EndEvent(ActionType.Lookup, ["node_kiwi", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -97,8 +97,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.push(EndEvent(ActionType.Lookup, ["node1", "value0"], "id2"))
+        trace.append(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
+        trace.append(EndEvent(ActionType.Lookup, ["node1", "value0"], "id2"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -115,8 +115,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Store, ["node0", "key0"], "id1"))
-        trace.push(EndEvent(ActionType.Store, ["node1", "value0"], "id1"))
+        trace.append(BeginEvent(ActionType.Store, ["node0", "key0"], "id1"))
+        trace.append(EndEvent(ActionType.Store, ["node1", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -135,10 +135,10 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2), "i2": IntervalValue(1, 3)}
         
         trace = Trace()
-        trace.push(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.push(BeginEvent(ActionType.Store,["node2", "key1", "value0"], "id2"))
-        trace.push(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
-        trace.push(EndEvent(ActionType.Store, ["node3"], "id2"))
+        trace.append(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
+        trace.append(BeginEvent(ActionType.Store,["node2", "key1", "value0"], "id2"))
+        trace.append(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append(EndEvent(ActionType.Store, ["node3"], "id2"))
 
         result = action1.evaluate(trace, eval_store, interval_store)
 

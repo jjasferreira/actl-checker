@@ -53,7 +53,7 @@ class Trace:
     def __len__(self) -> int:
         return len(self.trace)
 
-    def push(self, event : Event):
+    def append(self, event : Event):
         self.trace.append(event)
 
 

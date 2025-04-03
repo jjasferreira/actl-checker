@@ -96,7 +96,7 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
                 # Event is never None, assert just for type checking
                 assert event is not None
 
-                trace.push(event)
+                trace.append(event)
 
                 for value in values:
                     # TODO:
