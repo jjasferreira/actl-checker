@@ -92,8 +92,9 @@ class Var(Formula):
         return store[self.label]
 
     def __repr__(self):
-        return f"{self.label}"
+        return f"Var({self.label})"
 
+# NOTE: Useless?
 # class VarValue(Formula):
 #     def __init__(self, label, value):
 #         self.label = label
@@ -227,7 +228,8 @@ class Exists(Quantifier):
     # TODO: evaluate
     def evaluate(self, _) -> Any:
         raise NotImplementedError
-
+    
+    # TODO:
     # def evaluate(self, trace : Trace, store, interval_store): 
     #     for value in valores possiveis do traço, distinguir entre intervalos e restantes variaveis
     #         new_store = store.copy()
@@ -266,6 +268,7 @@ class Action(Formula):
                  trace : Trace,
                  var_store : dict[str, str],
                  interval_store : dict[str, IntervalValue]) -> Any: # type: ignore
+                 interval_store : dict[str, IntervalValue]) -> Any:
 
         action_interval = self.interval.evaluate(trace, var_store, interval_store)
 
@@ -277,6 +280,7 @@ class Action(Formula):
 
         completed_begin_event = trace.complete_event(begin_event, action_interval.begin)
 
+        # TEST:
         # print(f"{evaluated_interval = }")
         # print(f"{evaluated_input = }")
         # print(f"{evaluated_output = }")
@@ -295,6 +299,7 @@ class Action(Formula):
 
         completed_end_event = trace.complete_event(end_event, action_interval.end)
 
+        # TEST:
         # print(f"{new_event_e = }")
 
         return (completed_end_event is not None) and completed_end_event.id == completed_begin_event.id

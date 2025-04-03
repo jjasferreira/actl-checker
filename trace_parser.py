@@ -16,7 +16,6 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
     var_store : dict[str, str] = {}
     interval_store : dict[str, IntervalValue] = {}
 
-    # ongoing_actions : dict[str, int] = {}
     ongoing_actions : dict[str, IntervalValue] = {}
 
     line_count = 0
@@ -33,11 +32,11 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
 
 
 
-                # Incorrectly mapped double commas to empty strings in the list
+                # WARNING: Incorrectly mapped double commas to empty strings in the list
                 # components = [x.strip() for x in line.split(",")]
 
 
-                # Now removes empty strings from the list
+                # NOTE: Now removes empty strings from the list
                 # TODO: double check logs to confirm it is the desired behaviour
                 components = [x.strip() for x in line.split(",") if x.strip()]
                 # components = list(map(lambda x: x.strip(","), line.strip().split(", ")))
@@ -58,7 +57,6 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
 
 
                 try:
-                    # action_type = ActionType[event_type.capitalize()]
                     stripped_event_type = event_type.removeprefix("Reply").removeprefix("End")
                     action_type = ActionType[stripped_event_type]
                 except KeyError:
@@ -66,7 +64,7 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
                     continue
 
 
-                #TODO:temporary 
+                # HACK:temporary 
                 # Ignore until log preprocessing adds ids
                 if action_type in (ActionType.Ideal, ActionType.Stable, ActionType.ReadOnly, 
                                   ActionType.Member, ActionType.Responsible):
@@ -93,7 +91,7 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
 
                     assert success, f"Line: {line_count}| End event {event_id} matches action that already terminated: {interval_value}"
 
-                # Event is never None, assert just for type checking
+                # NOTE: Event is never None, assert just for type checking
                 assert event is not None
 
                 trace.append(event)
@@ -113,7 +111,7 @@ def parse_trace(file_path: str, max_lines : int | None) -> tuple[Trace, dict[str
     return trace, var_store, interval_store
 
 
-# Function defined in main.py, redefined to avoid circular import
+# NOTE: Function defined in main.py, redefined to avoid circular import
 def file_path(path: str) -> str:
     if os.path.isfile(path):
         return path
@@ -122,9 +120,6 @@ def file_path(path: str) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Parse a trace file and generate Trace, var_store, and interval_store.")
     parser.add_argument("-f", "--file", type=file_path, required=True, help="Path to the trace file")
-    # parser.add_argument("-n", "--line-limit", type=int, default=float("inf"),
-    #                     help="Maximum number of lines to process (default: all)")
-
     parser.add_argument("-n", "--num-lines", type=int, default=None, 
                         help="Maximum number of lines to process (default: all)")
 
