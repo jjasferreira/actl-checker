@@ -311,9 +311,9 @@ class ForAll(Quantifier):
 
         # TEST: remove
         # for temporary debugging
-        # print("\nForall")
-        # for v in self.var:
-        #     print(f"var: {type(v)} {v = }")
+        print("\nForall")
+        for v in self.vars:
+            print(f"var: {type(v)} {v = }")
 
 
         return f"∀({var_str}). ({self.expr})"
@@ -374,14 +374,14 @@ class Action(Formula):
 
         # HACK: remove
         # for temporary debugging
-        # print("\nAction")
-        # print(f"Interval: {type(self.interval)} {self.interval = }") 
-        # print(f"input: {type(self.input)} {self.input = }")
-        # for inp in self.input:
-        #     print(f"input: {type(inp)} {inp = }")
-        # print(f"output: {type(self.output)} {self.output = }")
-        # for out in self.output:
-        #     print(f"output: {type(out)} {out = }")
+        print("\nAction")
+        print(f"Interval: {type(self.interval)} {self.interval = }") 
+        print(f"input: {type(self.input)} {self.input = }")
+        for inp in self.input:
+            print(f"input: {type(inp)} {inp = }")
+        print(f"output: {type(self.output)} {self.output = }")
+        for out in self.output:
+            print(f"output: {type(out)} {out = }")
 
         return f"{type_str}[{self.interval}] ({input_str}) -> ({output_str})"
 

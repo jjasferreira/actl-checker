@@ -79,10 +79,16 @@ class Transformer(Transformer):
             raise ValueError(f"Unknown relation {items[0]}")
 
     def var(self, items):
+        # WARNING: Never reahced
+        raise ValueError(f"Kaboom {items = }")
         return Var(items[0])
-    
+
+
     def anyvars(self, items):
-        return [item.value for item in items]
+        # HACK: intended solution??
+        return [Interval(item.value) if item.value[0] == 'i' else Var(item.value) for item in items]
+        # return ["banana" for item in items]
+        # return [item.value for item in items]
 
     def somevars(self, items):
         return [item.value for item in items]
