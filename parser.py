@@ -87,24 +87,28 @@ class Transformer(Transformer):
     def somevars(self, items):
         return [item.value for item in items]
 
+def parse_ast(input : str) -> Formula:
+    tree = parser.parse(input)
+    return Transformer().transform(tree)
 
-# Testing
+if __name__ == "__main__":
+    # Testing
 
-input = """
-(forall (i x y)
-  (implies
-    (lookup i (x) (y))
-    (exists (j)
-      (and
-        (store j (x y) ())
-        (before j i)
+    input = """
+    (forall (i x y)
+      (implies
+        (lookup i (x) (y))
+        (exists (j)
+          (and
+            (store j (x y) ())
+            (before j i)
+          )
+        )
       )
-    )
-  )
-)"""
+    )"""
 
-output1 = parser.parse(input)
-print(output1)
+    output1 = parser.parse(input)
+    print(output1)
 
-output2 = Transformer().transform(output1)
-print(output2)
+    output2 = Transformer().transform(output1)
+    print(output2)
