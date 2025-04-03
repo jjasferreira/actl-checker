@@ -50,8 +50,12 @@ class Trace:
         else:
             self.trace = []
 
+    def __len__(self) -> int:
+        return len(self.trace)
+
     def push(self, event : Event):
         self.trace.append(event)
+
 
     def complete_event(self, event : Event, t : int) -> None | Event: 
         assert event.id is None
@@ -72,7 +76,7 @@ class Trace:
 
 class Formula(ABC):
     @abstractmethod
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace : Trace, store : dict[str, str], interval_store : "dict[str, IntervalValue]") -> Any:
         pass
 
 
@@ -112,7 +116,14 @@ class IntervalValue(Formula):
             self.end = float("inf")
         else: 
             self.end = end
-    
+   
+    def complete_end(self, end : int) -> bool:
+        if self.end != float("inf"):
+            return False
+        else:
+            self.end = end
+            return True
+
     def evaluate(self, _trace, _store, _interval_store):
         return self
 

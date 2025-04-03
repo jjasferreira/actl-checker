@@ -3,6 +3,7 @@ import os
 import sys
 from ast_nodes import Formula
 from parser import parse_ast
+from trace_parser import parse_trace
 
 def parse_input(input_text: str) -> Formula:
     try:
@@ -22,6 +23,15 @@ def main():
     parser = argparse.ArgumentParser(description="Parse a DSL and generate its AST.")
     parser.add_argument("-f", "--file", type=file_path, help="Path to an input file")
     parser.add_argument("-e", "--expr", type=str, help="Expression to parse if no file is provided")
+    
+    #TODO: change trace to log?'
+    parser.add_argument("-t", "--trace", type=file_path, help="Path to trace file")
+    parser.add_argument("-n", "--num-lines", type=int, default=None, 
+                        help="Maximum number of lines to process (default: all)")
+
+
+
+
     args = parser.parse_args()
 
 
@@ -49,6 +59,15 @@ def main():
 
     ast = parse_input(input_text)
     print(ast)
+
+
+    if args.trace:
+        trace, var_store, interval_store = parse_trace(args.file, args.num_lines)
+
+        print("Evaluating formula:")
+        result = ast.evaluate(trace, var_store, interval_store)
+        print(f"Result: {result}")
+    
 
 if __name__ == "__main__":
     main()
