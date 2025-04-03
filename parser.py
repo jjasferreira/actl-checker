@@ -1,32 +1,40 @@
-from lark import Lark, Transformer
+DEBUG = False
+
+from lark import Lark, Token, Tree, Transformer
 from ast_nodes import *
 
 grammar = r"""
-    ?start: expr
-    ?expr: action
-         | equal
-         | not_
-         | and_
-         | or_
-         | implies
-         | forall
-         | exists
-         | relation
-         | "(" expr+ ")"
+    ?start: expression
+    ?expression: action
+               | equal
+               | not_
+               | and_
+               | or_
+               | implies
+               | forall
+               | forallinterval
+               | exists
+               | existsinterval
+               | relation
 
-    ?action: "(" var var anyvars anyvars ")"
-    ?equal: "(" "equal" var var ")"
-    ?not_: "(" "not" expr ")"
-    ?and_: "(" "and" expr expr ")"
-    ?or_: "(" "or" expr expr ")"
-    ?implies: "(" "implies" expr expr ")"
-    ?forall: "(" "forall" somevars expr ")"
-    ?exists: "(" "exists" somevars expr ")"
-    ?relation: "(" var var var ")"
+    ?action: "(" action_type interval any_variables any_variables ")"
+    ?equal: "(" "equal" variable variable ")"
+    ?not_: "(" "not" expression ")"
+    ?and_: "(" "and" expression expression ")"
+    ?or_: "(" "or" expression expression ")"
+    ?implies: "(" "implies" expression expression ")"
+    ?forall: "(" "forall" some_variables expression ")"
+    ?forallinterval: "(" "forallinterval" interval expression ")"
+    ?exists: "(" "exists" some_variables expression ")"
+    ?existsinterval: "(" "existsinterval" interval expression ")"
+    ?relation: "(" relation_type interval interval ")"
 
-    ?var: CNAME
-    ?anyvars: "(" var* ")" 
-    ?somevars: "(" var+ ")" 
+    ?action_type: CNAME -> action_type
+    ?relation_type: CNAME
+    ?interval: CNAME -> interval
+    ?variable: CNAME -> variable
+    ?any_variables: "(" variable* ")"
+    ?some_variables: "(" variable+ ")"
 
     %import common.CNAME
     %import common.WS
@@ -37,7 +45,7 @@ parser = Lark(grammar, start="start")
 
 class Transformer(Transformer):
     def action(self, items):
-        return Action(ActionType[items[0].capitalize()], items[1], items[2], items[3])
+        return Action(items[0], items[1], items[2], items[3])
 
     def equal(self, items):
         return Equal(items[0], items[1])
@@ -56,8 +64,16 @@ class Transformer(Transformer):
     
     def forall(self, items):
         return ForAll(items[0], items[1])
+    
+    def forallinterval(self, items):
+        # TODO: implement ForAllInterval?
+        return ForAll(items[0], items[1])
 
     def exists(self, items):
+        return Exists(items[0], items[1])
+    
+    def existsinterval(self, items):
+        # TODO: implement ExistsInterval?
         return Exists(items[0], items[1])
     
     def relation(self, items):
@@ -78,43 +94,67 @@ class Transformer(Transformer):
         else:
             raise ValueError(f"Unknown relation {items[0]}")
 
-    def var(self, items):
-        # WARNING: Never reahced
-        raise ValueError(f"Kaboom {items = }")
+    def action_type(self, items):
+        if items[0].capitalize() in ActionType.__members__:
+            return ActionType[items[0].capitalize()]
+        else:
+            raise ValueError(f"Unknown action type {items[0].capitalize()}")
+    
+    def relation_type(self, items):
+        pass
+
+    def variable(self, items):
         return Var(items[0])
+    
+    def interval(self, items):
+        return Interval(items[0])
 
+    def any_variables(self, items):
+        return items
 
-    def anyvars(self, items):
-        # HACK: intended solution??
-        return [Interval(item.value) if item.value[0] == 'i' else Var(item.value) for item in items]
-        # return ["banana" for item in items]
-        # return [item.value for item in items]
+    def some_variables(self, items):
+        return items
 
-    def somevars(self, items):
-        return [item.value for item in items]
+def print_tree(tree, indent = 0):
+    """Recursively prints a Lark tree with indentation for readability."""
+    if isinstance(tree, Token):
+        print(4 * " " * indent + f"Token({tree.type}, '{tree.value}')")
+    elif isinstance(tree, Tree):
+        print(4* " " * indent + f"Tree(Token(RULE, {tree.data}))")
+        for child in tree.children:
+            print_tree(child, indent + 1)
 
 def parse_ast(input : str) -> Formula:
     tree = parser.parse(input)
-    return Transformer().transform(tree)
+    if DEBUG:
+        print_tree(tree)
+        print("-"*30)
+    ast = Transformer().transform(tree)
+    if DEBUG:
+        print(ast) #TODO: print_ast(ast)
+        print("-"*30)
+    return ast
 
 if __name__ == "__main__":
-    # Testing
 
-    input = """
-    (forall (i x y)
-      (implies
-        (lookup i (x) (y))
-        (exists (j)
-          (and
-            (store j (x y) ())
-            (before j i)
-          )
+    input1 = """
+    (forallinterval i
+        (forall (x y)
+            (implies
+                (lookup i (x) (y))
+                (existsinterval j
+                (and
+                    (store j (x y) ())
+                    (before j i)
+                )
+                )
+            )
         )
-      )
     )"""
 
-    output1 = parser.parse(input)
-    print(output1)
+    input2 = """
+    (lookup j (x y z) (a b))
+    """
 
-    output2 = Transformer().transform(output1)
-    print(output2)
+    DEBUG = True
+    ast = parse_ast(input1)
