@@ -24,16 +24,12 @@ def main():
     parser.add_argument("-f", "--file", type=file_path, help="Path to an input file")
     parser.add_argument("-e", "--expr", type=str, help="Expression to parse if no file is provided")
     
-    #TODO: change trace to log?'
+    #TODO: change trace to log?
     parser.add_argument("-t", "--trace", type=file_path, help="Path to trace file")
     parser.add_argument("-n", "--num-lines", type=int, default=None, 
                         help="Maximum number of lines to process (default: all)")
 
-
-
-
     args = parser.parse_args()
-
 
     if args.file is not None:
         try:
@@ -62,11 +58,12 @@ def main():
 
 
     if args.trace:
-        trace = parse_trace_file(args.file, args.num_lines)
+        trace = parse_trace_file(args.trace, args.num_lines)
         var_store = {}
         interval_store = {}
 
         print("Evaluating formula:")
+        print(ast)
         result = ast.evaluate(trace, var_store, interval_store)
         print(f"Result: {result}")
     
