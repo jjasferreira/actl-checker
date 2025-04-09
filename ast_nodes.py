@@ -32,8 +32,8 @@ class Event(ABC):
     def matches(self, other):
         if not isinstance(other, Event):
             return False
-
-        return self.action_type == other.action_type and self.values == other.values
+        else:
+            return self.action_type == other.action_type and self.values == other.values
 
 class BeginEvent(Event):
     def __init__(self, action_type : ActionType, values : list[str], id):
@@ -88,6 +88,7 @@ class Trace:
 
     def insert_value(self, vars : VarCollection, action_type : ActionType, index : int, value: str): 
         vars[(action_type, index)].append(value)
+
     def complete_event(self, event : Event, t : int) -> None | Event: 
         assert event.id is None
 
@@ -101,7 +102,6 @@ class Trace:
             return None
 
     def __repr__(self):
-
         return  f"Trace(Events: {self.events};\nInputs: {self.inputs};\nOutputs: {self.outputs};\nIntervals: {self.intervals})"
 
 
@@ -128,19 +128,6 @@ class Var(Formula):
 
     def __repr__(self):
         return f"Var({self.label})"
-
-# NOTE: Useless?
-# class VarValue(Formula):
-#     def __init__(self, label, value):
-#         self.label = label
-#         self.value = value
-#
-#     def evaluate(self, _trace : Trace, store, _interval_store):
-#         return self.value
-#
-#     def __repr__(self):
-#         return f"Var:{self.label}"
-
 
 
 class IntervalValue(Formula):
@@ -259,7 +246,6 @@ class Implies(BinaryExpr):
         return f"({self.left} => {self.right})"
 
 
-
 class Quantifier(Formula, ABC):
     @abstractmethod
     def __init__(self, vars : Var | list[Var], expr : Formula):
@@ -288,7 +274,7 @@ class Quantifier(Formula, ABC):
 
         else:
 
-            #TODO: check if var is not bounded in current store?
+            #TODO: check if var is not bound in current store?
             var = self.vars[var_idx]
 
             possible_values = self.expr.get_possible_values(trace, var_store, interval_store, var)
@@ -306,9 +292,6 @@ class Quantifier(Formula, ABC):
                     return False
 
                 result = self.evaluate_naively_recursive(trace, var_store, interval_store, short_circuit_on, var_idx + 1)
-
-                # print(f"Recursive case without value, Evaluating {var_idx = }, {var = }: {self.expr} with {var_store} -> {result}")
-                # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store}")
 
                 return result
 
@@ -351,15 +334,6 @@ class ForAll(Quantifier):
 
     def __repr__(self):
         var_str = ", ".join(map(str, self.vars))
-
-
-        # TEST: remove
-        # for temporary debugging
-        print("\nForall")
-        for v in self.vars:
-            print(f"var: {type(v)} {v = }")
-
-
         return f"∀({var_str}). ({self.expr})"
 
 
@@ -387,17 +361,8 @@ class Action(Formula):
 
         completed_begin_event = trace.complete_event(begin_event, action_interval.begin)
 
-        # TEST:
-        # print(f"{evaluated_interval = }")
-        # print(f"{evaluated_input = }")
-        # print(f"{evaluated_output = }")
-        # print(f"{ev_b = }")
-        # print(f"{ev_e = }")
-        # print(f"{new_event_b = }")
-
         if completed_begin_event is None:
             return False
-
 
         completed_end_event = trace.complete_event(end_event, action_interval.end)
 
@@ -412,8 +377,6 @@ class Action(Formula):
         # if t2 = "inf" then no end event should match its id
         # if evaluated_interval.end is not None:
     
-
-        
         return (completed_end_event is not None) and completed_end_event.id == completed_begin_event.id
 
     def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
@@ -435,17 +398,6 @@ class Action(Formula):
         type_str = self.action_type.name.lower()
         input_str = ", ".join(map(str, self.input))
         output_str = ", ".join(map(str, self.output))
-
-        # HACK: remove
-        # for temporary debugging
-        print("\nAction")
-        print(f"Interval: {type(self.interval)} {self.interval = }") 
-        print(f"input: {type(self.input)} {self.input = }")
-        for inp in self.input:
-            print(f"input: {type(inp)} {inp = }")
-        print(f"output: {type(self.output)} {self.output = }")
-        for out in self.output:
-            print(f"output: {type(out)} {out = }")
 
         return f"{type_str}[{self.interval}] ({input_str}) -> ({output_str})"
 
