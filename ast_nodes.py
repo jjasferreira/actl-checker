@@ -145,7 +145,6 @@ class Var(Formula):
 
 
 class IntervalValue(Formula):
-    #TODO: explicit types in init, int or datetime
     def __init__(self, begin : int, end : int | None = None): 
         self.begin = begin
         
@@ -184,9 +183,7 @@ class Interval(Formula):
         return interval_store[self.label]
 
     def __repr__(self):
-        return f"{self.label}"
-
-
+        return f"Interval({self.label})"
 
 class UnaryExpr(Formula, ABC):
     @abstractmethod
@@ -194,7 +191,7 @@ class UnaryExpr(Formula, ABC):
         self.expr = expr
 
     def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
-                            target_var : str) -> list[str]:
+                            target_var : Var) -> list[str]:
         return self.expr.get_possible_values(trace, store, interval_store, target_var)
 
 
@@ -219,7 +216,7 @@ class BinaryExpr(Formula, ABC):
         self.right = right
 
     def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
-                            target_var : str) -> list[str]:
+                            target_var : Var) -> list[str]:
         possible_values = self.left.get_possible_values(trace, store, interval_store, target_var)
         possible_values.extend(self.right.get_possible_values(trace, store, interval_store, target_var))
         return possible_values
@@ -350,7 +347,6 @@ class Exists(Quantifier):
         return f"∃({var_str}). ({self.expr})"
 
 class ForAll(Quantifier):
-
     def __init__(self, vars, expr):
         super().__init__(vars, expr)
 
