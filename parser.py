@@ -66,15 +66,13 @@ class Transformer(Transformer):
         return ForAll(items[0], items[1])
     
     def forallinterval(self, items):
-        # TODO: implement ForAllInterval?
-        return ForAll(items[0], items[1])
+        return ForAllInterval(items[0], items[1])
 
     def exists(self, items):
         return Exists(items[0], items[1])
     
     def existsinterval(self, items):
-        # TODO: implement ExistsInterval?
-        return Exists(items[0], items[1])
+        return ExistsInterval(items[0], items[1])
     
     def relation(self, items):
         if items[0] == "before":
