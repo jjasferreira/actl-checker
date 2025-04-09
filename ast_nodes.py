@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
 from typing import Any, TypeAlias
+
+import sys
+
 IntervalCollection : TypeAlias = dict["ActionType", list["IntervalValue"]]
 VarCollection : TypeAlias = dict[tuple["ActionType", int], list[str]]
 
@@ -107,6 +110,9 @@ class Formula(ABC):
     def evaluate(self, trace : Trace, store : dict[str, str], interval_store : "dict[str, IntervalValue]") -> Any:
         pass
 
+    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
+                            var : "Var") -> list[str]:
+        return []
 
 
 class Var(Formula):
@@ -118,6 +124,7 @@ class Var(Formula):
             raise ValueError(f"Variable {self.label} not found in store")
 
         return store[self.label]
+
 
     def __repr__(self):
         return f"Var({self.label})"
@@ -185,6 +192,10 @@ class UnaryExpr(Formula, ABC):
     def __init__(self, expr):
         self.expr = expr
 
+    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
+                            target_var : str) -> list[str]:
+        return self.expr.get_possible_values(trace, store, interval_store, target_var)
+
 class Not(UnaryExpr):
     def __init__(self, expr):
         super().__init__(expr)
@@ -200,6 +211,12 @@ class BinaryExpr(Formula, ABC):
     def __init__(self, left, right):
         self.left = left
         self.right = right
+
+    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
+                            target_var : str) -> list[str]:
+        possible_values = self.left.get_possible_values(trace, store, interval_store, target_var)
+        possible_values.extend(self.right.get_possible_values(trace, store, interval_store, target_var))
+        return possible_values
 
 class Equal(BinaryExpr):
     def __init__(self, left, right):
@@ -245,22 +262,26 @@ class Implies(BinaryExpr):
 
 class Quantifier(Formula, ABC):
     @abstractmethod
-    def __init__(self, vars, expr):
+    def __init__(self, vars : Var | list[Var], expr : Formula):
         self.vars = vars if isinstance(vars, list) else [vars]
         self.expr = expr
 
-class Exists(Quantifier):
-    def __init__(self, vars, expr):
-        super().__init__(vars, expr)
-    
-    # TODO: Generalise evaluation function to avoid code duplication
-    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
-        return self.naive_aux(trace, var_store, interval_store, 0)
+    def get_possible_values(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], var: Var) -> list[str]:
+        if var in self.vars:
+            return []
+        else:
+            return self.expr.get_possible_values(trace, store, interval_store, var)
 
-    def naive_aux(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
-            var_idx : int) -> bool:
+
+    def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
+                        short_circuit_on : bool):
+        return self.evaluate_naively_recursive(trace, var_store, interval_store, short_circuit_on, 0)
+
+
+    def evaluate_naively_recursive(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
+                     short_circuit_on : bool, var_idx : int) -> bool:
+
         if var_idx >= len(self.vars):
-
             result =  self.expr.evaluate(trace, var_store, interval_store)
             # print(f"Base case Evaluating: {self.expr} with {var_store} -> {result}")
             return result
@@ -269,23 +290,52 @@ class Exists(Quantifier):
 
             #TODO: check if var is not bounded in current store?
             var = self.vars[var_idx]
+
+            possible_values = self.expr.get_possible_values(trace, var_store, interval_store, var)
+    
+            # print(f"{var = } {possible_values = }")
+
+            #TODO: Double check if it is handled correctly:
+            # if no possible values exist then
+            # return False for Exists
+            # evaluate the expression for ForAll 
+            if not possible_values:
+                print(f"Warning: No possible values found for {var}.", file=sys.stderr)
+
+                if short_circuit_on: # == True
+                    return False
+
+                result = self.evaluate_naively_recursive(trace, var_store, interval_store, short_circuit_on, var_idx + 1)
+
+                # print(f"Recursive case without value, Evaluating {var_idx = }, {var = }: {self.expr} with {var_store} -> {result}")
+                # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store}")
+
+                return result
+
             if isinstance(var, Var):
-                for value in var_store.values():
+                for value in possible_values:                    
                     new_store = var_store.copy()
                     new_store[var.label] = value
 
-                    result = self.naive_aux(trace, new_store, interval_store, var_idx + 1)
+                    result = self.evaluate_naively_recursive(trace, new_store, interval_store, short_circuit_on, var_idx + 1)
                     # print(f"Recursive case Evaluating {var_idx = }, {var = }, { value = }: {self.expr} with {var_store} -> {result}")
-                    if result:
-                        return True
+                    if result == short_circuit_on:
+                        return short_circuit_on
                 else:
 
-                    # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store} -> {True}")
-                    return False
+                    # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store}")
+                    return not short_circuit_on
             else: 
                 assert isinstance(var, Interval), f"Unexpected quantifiable type: {type(var)}"
                 
                 raise NotImplementedError("Interval quantification not implemented")
+
+class Exists(Quantifier):
+    def __init__(self, vars, expr):
+        super().__init__(vars, expr)
+    
+    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
+        return self.evaluate_naively(trace, var_store, interval_store, True)
 
     def __repr__(self):
         var_str = ", ".join(map(str, self.vars))
@@ -293,45 +343,11 @@ class Exists(Quantifier):
 
 class ForAll(Quantifier):
 
-    # TODO: add types to the quantifier
-
     def __init__(self, vars, expr):
         super().__init__(vars, expr)
 
     def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
-        return self.naive_aux(trace, var_store, interval_store, 0)
-
-
-    def naive_aux(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
-            var_idx : int) -> bool:
-        if var_idx >= len(self.vars):
-
-            result =  self.expr.evaluate(trace, var_store, interval_store)
-            # print(f"Base case Evaluating: {self.expr} with {var_store} -> {result}")
-            return result
-
-        else:
-
-            #TODO: check if var is not bounded in current store?
-            var = self.vars[var_idx]
-            if isinstance(var, Var):
-                for value in var_store.values():
-                    new_store = var_store.copy()
-                    new_store[var.label] = value
-
-                    result = self.naive_aux(trace, new_store, interval_store, var_idx + 1)
-                    # print(f"Recursive case Evaluating {var_idx = }, {var = }, { value = }: {self.expr} with {var_store} -> {result}")
-                    if not result:
-                        return False
-                else:
-
-                    # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store} -> {True}")
-                    return True
-            else: 
-                assert isinstance(var, Interval), f"Unexpected quantifiable type: {type(var)}"
-                
-                raise NotImplementedError("Interval quantification not implemented")
-
+        return self.evaluate_naively(trace, var_store, interval_store, False)
 
     def __repr__(self):
         var_str = ", ".join(map(str, self.vars))
@@ -350,7 +366,7 @@ class ForAll(Quantifier):
 
 
 class Action(Formula):
-    def __init__(self, action_type: ActionType, interval, inputs : Var | list[Var], outputs : Var | list[Var]):
+    def __init__(self, action_type: ActionType, interval : Interval, inputs : Var | list[Var], outputs : Var | list[Var]):
         self.action_type = action_type
         self.interval = interval
         self.input = inputs if isinstance(inputs, list) else [inputs]
@@ -382,18 +398,38 @@ class Action(Formula):
         if completed_begin_event is None:
             return False
 
-        # TODO: 
-        # Deal with infinite intervals
-        # end_event is not None iff t2 = "inf"
-        # if t2 = "inf" then no end event should match its id
-        # if evaluated_interval.end is not None:
 
         completed_end_event = trace.complete_event(end_event, action_interval.end)
 
-        # TEST:
-        # print(f"{new_event_e = }")
+        # NOTE:
+        # Handle infinite intervals
+        # end_event is not None iff t2 = "inf"
+        if completed_end_event is None:
+            return action_interval.end == float("inf")
+            
+        # TODO: 
+        # Handle with infinite intervals
+        # if t2 = "inf" then no end event should match its id
+        # if evaluated_interval.end is not None:
+    
 
+        
         return (completed_end_event is not None) and completed_end_event.id == completed_begin_event.id
+
+    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
+                            var : Var) -> list[str]:
+        possible_values = []
+        # print(f"{var = } {self.input = } {self.output = } ")
+        # print(f"{ trace = }")
+
+        for (i, action_var) in enumerate(self.input):
+            if action_var.label == var.label:
+                possible_values.extend(trace.inputs[(self.action_type, i)])
+
+        for (i, action_var) in enumerate(self.output):
+            if action_var.label == var.label:
+                possible_values.extend(trace.outputs[(self.action_type, i)])
+        return possible_values
 
     def __repr__(self):
         type_str = self.action_type.name.lower()
