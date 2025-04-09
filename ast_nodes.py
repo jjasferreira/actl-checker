@@ -223,8 +223,8 @@ class BinaryExpr(Formula, ABC):
 
     def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
                             interval : "Interval") -> list["Action"]:
-        possible_actions = self.left.get_possible_intervals(trace, store, interval_store, interval)
-        possible_actions.extend(self.right.get_possible_intervals(trace, store, interval_store, interval))
+        possible_actions = self.left.get_possible_actions(trace, store, interval_store, interval)
+        possible_actions.extend(self.right.get_possible_actions(trace, store, interval_store, interval))
         return possible_actions
 
 
