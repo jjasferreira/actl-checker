@@ -89,6 +89,11 @@ class Trace:
     def insert_value(self, vars : VarCollection, action_type : ActionType, index : int, value: str): 
         vars[(action_type, index)].append(value)
 
+    def get_inputs(self,  action_type : ActionType, index : int) -> list[str]:
+        return self.inputs[(action_type, index)]
+
+    def get_outputs(self,  action_type : ActionType, index : int) -> list[str]:
+        return self.outputs[(action_type, index)]
     def complete_event(self, event : Event, t : int) -> None | Event: 
         assert event.id is None
 
@@ -387,11 +392,11 @@ class Action(Formula):
 
         for (i, action_var) in enumerate(self.input):
             if action_var.label == var.label:
-                possible_values.extend(trace.inputs[(self.action_type, i)])
+                possible_values.extend(trace.get_inputs(self.action_type, i))
 
         for (i, action_var) in enumerate(self.output):
             if action_var.label == var.label:
-                possible_values.extend(trace.outputs[(self.action_type, i)])
+                possible_values.extend(trace.get_outputs(self.action_type, i))
         return possible_values
 
     def __repr__(self):
