@@ -300,23 +300,18 @@ class Quantifier(Formula, ABC):
 
                 return result
 
-            if isinstance(var, Var):
-                for value in possible_values:                    
-                    new_store = var_store.copy()
-                    new_store[var.label] = value
+            for value in possible_values:                    
+                new_store = var_store.copy()
+                new_store[var.label] = value
 
-                    result = self.evaluate_naively_recursive(trace, new_store, interval_store, short_circuit_on, var_idx + 1)
-                    # print(f"Recursive case Evaluating {var_idx = }, {var = }, { value = }: {self.expr} with {var_store} -> {result}")
-                    if result == short_circuit_on:
-                        return short_circuit_on
-                else:
+                result = self.evaluate_naively_recursive(trace, new_store, interval_store, short_circuit_on, var_idx + 1)
+                # print(f"Recursive case Evaluating {var_idx = }, {var = }, { value = }: {self.expr} with {var_store} -> {result}")
+                if result == short_circuit_on:
+                    return short_circuit_on
+            else:
 
-                    # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store}")
-                    return not short_circuit_on
-            else: 
-                assert isinstance(var, Interval), f"Unexpected quantifiable type: {type(var)}"
-                
-                raise NotImplementedError("Interval quantification not implemented")
+                # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store}")
+                return not short_circuit_on
 
 class Exists(Quantifier):
     def __init__(self, vars, expr):
