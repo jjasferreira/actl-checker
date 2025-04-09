@@ -3,7 +3,7 @@ import os
 import sys
 from ast_nodes import Formula
 from parser import parse_ast
-from trace_parser import parse_trace
+from trace_parser import parse_trace_file
 
 def parse_input(input_text: str) -> Formula:
     try:
@@ -62,7 +62,9 @@ def main():
 
 
     if args.trace:
-        trace, var_store, interval_store = parse_trace(args.file, args.num_lines)
+        trace = parse_trace_file(args.file, args.num_lines)
+        var_store = {}
+        interval_store = {}
 
         print("Evaluating formula:")
         result = ast.evaluate(trace, var_store, interval_store)

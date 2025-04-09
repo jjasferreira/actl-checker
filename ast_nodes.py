@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from enum import Enum
-from typing import Any
+from typing import Any, TypeAlias
+IntervalCollection : TypeAlias = dict["ActionType", list["IntervalValue"]]
+VarCollection : TypeAlias = dict[tuple["ActionType", int], list[str]]
 
 
 class ActionType(Enum):
@@ -44,34 +47,59 @@ class EndEvent(Event):
         return f"EndEvent({self.id}, {self.action_type}, {self.values})"
 
 class Trace:
-    def __init__(self, trace : list[Event] = []):
-        if trace:
-            self.trace = trace
-        else:
-            self.trace = []
+    def __init__(self, events : list[Event] | None = None, 
+                 intervals : IntervalCollection | None = None, 
+                 inputs : VarCollection | None = None,
+                 outputs : VarCollection | None = None):
+
+        if events is None:
+            events = []
+        if intervals is None:
+            intervals = defaultdict(list)
+        if inputs is None:
+            inputs = defaultdict(list)
+        if outputs is None:
+            outputs = defaultdict(list)
+         
+        self.events = events
+        self.intervals = intervals
+        self.inputs = inputs
+        self.outputs = outputs
 
     def __len__(self) -> int:
-        return len(self.trace)
+        return len(self.events)
 
-    def append(self, event : Event):
-        self.trace.append(event)
+    def append_event(self, event : Event):
+        self.events.append(event)
 
+    def insert_interval(self, action_type : ActionType, interval_value: "IntervalValue"):
+        # TODO: use defaultdict or setdefault?
+        # self.intervals[action_type].append(interval_value)
+        self.intervals.setdefault(action_type, []).append(interval_value)
 
+    def insert_input(self, action_type : ActionType, index : int, input_Value: str):
+        self.insert_value(self.inputs, action_type, index, input_Value)
+
+    def insert_output(self, action_type : ActionType, index : int, output_value: str):
+        self.insert_value(self.outputs, action_type, index, output_value)
+
+    def insert_value(self, vars : VarCollection, action_type : ActionType, index : int, value: str): 
+        vars[(action_type, index)].append(value)
     def complete_event(self, event : Event, t : int) -> None | Event: 
         assert event.id is None
 
-        if t < 0 or t >= len(self.trace):
+        if t < 0 or t >= len(self.events):
             return None
 
-        candidate = self.trace[t]
+        candidate = self.events[t]
         if candidate.matches(event):
             return candidate
         else:
             return None
 
     def __repr__(self):
-        return f"Trace({self.trace})"
 
+        return  f"Trace(Events: {self.events};\nInputs: {self.inputs};\nOutputs: {self.outputs};\nIntervals: {self.intervals})"
 
 
 class Formula(ABC):
