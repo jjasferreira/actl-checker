@@ -4,7 +4,7 @@ from ast_nodes import *
 class TestActionEvaluation(unittest.TestCase):
 
     def test_action_evaluate_true(self):
-        action = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
         
         eval_store = {
             "x1": "node0", "x2": "key0", 
@@ -14,8 +14,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 1)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["node0", "key0"], "id1"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["node1", "value0"], "id1"))
 
         # print(f"{trace = }")
         # print(f"{eval_store = }")
@@ -31,7 +31,7 @@ class TestActionEvaluation(unittest.TestCase):
 
 
     def test_action_evaluate_false_boundary(self):
-        action = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
         
         eval_store = {
             "x1": "node0", "x2": "key0", 
@@ -41,15 +41,15 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["node0", "key0"], "id1"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["node1", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
         self.assertFalse(result)
 
     def test_action_evaluate_false_input(self):
-        action = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
         
         eval_store = {
             "x1": "node0", "x2": "key0", 
@@ -59,8 +59,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Lookup,["node_banana", "key0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["node_banana", "key0"], "id1"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["node1", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -68,7 +68,7 @@ class TestActionEvaluation(unittest.TestCase):
 
 
     def test_action_evaluate_false_output(self):
-        action = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
         
         eval_store = {
             "x1": "node0", "x2": "key0", 
@@ -78,15 +78,15 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["node_kiwi", "value0"], "id1"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["node0", "key0"], "id1"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["node_kiwi", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
         self.assertFalse(result)
 
     def test_action_evaluate_false_id(self):
-        action = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
         
         eval_store = {
             "x1": "node0", "x2": "key0", 
@@ -96,15 +96,15 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["node1", "value0"], "id2"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["node0", "key0"], "id1"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["node1", "value0"], "id2"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
         self.assertFalse(result)
 
     def test_action_evaluate_false_type(self):
-        action = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
         
         eval_store = {
             "x1": "node0", "x2": "key0", 
@@ -114,8 +114,8 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Store, ["node0", "key0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Store, ["node1", "value0"], "id1"))
+        trace.append_event(BeginEvent(ActionType.STORE, ["node0", "key0"], "id1"))
+        trace.append_event(EndEvent(ActionType.STORE, ["node1", "value0"], "id1"))
 
         result = action.evaluate(trace, eval_store, interval_store)
 
@@ -123,8 +123,8 @@ class TestActionEvaluation(unittest.TestCase):
 
 
     def test_2_actions_evaluate(self):
-        action1 = Action(ActionType.Lookup, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
-        action2 = Action(ActionType.Store, Interval("i2"), [Var("x3"), Var("x4"), Var("x5")], Var("y2"))
+        action1 = Action(ActionType.LOOKUP, Interval("i1"), [Var("x1"), Var("x2")], [Var("y1"), Var("x5")])
+        action2 = Action(ActionType.STORE, Interval("i2"), [Var("x3"), Var("x4"), Var("x5")], Var("y2"))
         
         eval_store = {
             "x1": "node0", "x2": "key0", "x3": "node2", 
@@ -134,10 +134,10 @@ class TestActionEvaluation(unittest.TestCase):
         interval_store = {"i1": IntervalValue(0, 2), "i2": IntervalValue(1, 3)}
         
         trace = Trace()
-        trace.append_event(BeginEvent(ActionType.Lookup,["node0", "key0"], "id1"))
-        trace.append_event(BeginEvent(ActionType.Store,["node2", "key1", "value0"], "id2"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["node1", "value0"], "id1"))
-        trace.append_event(EndEvent(ActionType.Store, ["node3"], "id2"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["node0", "key0"], "id1"))
+        trace.append_event(BeginEvent(ActionType.STORE,["node2", "key1", "value0"], "id2"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["node1", "value0"], "id1"))
+        trace.append_event(EndEvent(ActionType.STORE, ["node3"], "id2"))
 
         result = action1.evaluate(trace, eval_store, interval_store)
 

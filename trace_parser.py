@@ -65,18 +65,19 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     return
 
 
-                try:
-                    stripped_event_type = event_type.removeprefix("Reply").removeprefix("End")
-                    action_type = ActionType[stripped_event_type]
-                except KeyError:
+                stripped_event_type = event_type.removeprefix("Reply").removeprefix("End")
+
+                if ActionType.has_value(stripped_event_type):
+                    action_type = ActionType(stripped_event_type.upper())
+                else:
                     print(f"Unknown event type: {event_type}", file=sys.stderr)
                     return
 
 
                 # HACK:temporary 
-                # Ignore until log preprocessing adds ids
-                if action_type in (ActionType.Ideal, ActionType.Stable, ActionType.ReadOnly, 
-                                  ActionType.Member, ActionType.Responsible):
+                # Ignore until log preprocessing adds regimens and states
+                if action_type in (ActionType.IDEAL, ActionType.STABLE, ActionType.READONLY, 
+                                  ActionType.MEMBER, ActionType.RESPONSIBLE):
                     return
 
 
@@ -92,7 +93,7 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                         trace.insert_input(action_type, i, value)
 
 
-                if action_type == ActionType.Fail or event_type.startswith("Reply") or "End" in event_type:
+                if action_type == ActionType.FAIL or event_type.startswith("Reply") or "End" in event_type:
                     event = EndEvent(action_type, values, event_id)
 
                     interval_value = ongoing_actions.pop(event_id, None)

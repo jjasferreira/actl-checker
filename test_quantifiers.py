@@ -5,19 +5,38 @@ from ast_nodes import *
 class TestForAllEvaluation(unittest.TestCase):
 
 
-    # TODO: implement ForAllInterval and add it to quantify "i1"
-    # def test_forall_empty_trace(self):
-    #     action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
-    #     formula = ForAll(Var("n1"), action)
-    #
-    #     trace = Trace()
-    #
-    #     var_store = {}
-    #     interval_store = {}
-    #
-    #     result = formula.evaluate(trace, var_store, interval_store)
-    #
-    #     self.assertTrue(result)
+    def test_forall_no_action(self):
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), Var("n2"))
+        formula = ForAllInterval(Interval("i1"), ForAll(Var("n1"), action))
+
+
+        log ="""
+         # 11:00, Lookup, id-000, node1
+         # 12:00, Join, id-001, node1
+         12:10, Join, id-002, node2, 
+"""
+        trace = parse_trace_string(log)
+        # trace = Trace()
+
+        var_store = {}
+        interval_store = {}
+
+        result = formula.evaluate(trace, var_store, interval_store)
+
+        self.assertTrue(result)
+
+    def test_forall_empty_trace(self):
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
+        formula = ForAllInterval(Interval("i1"), ForAll(Var("n1"), action))
+
+        trace = Trace()
+
+        var_store = {}
+        interval_store = {}
+
+        result = formula.evaluate(trace, var_store, interval_store)
+
+        self.assertTrue(result)
 
 
     # TEST:
@@ -25,7 +44,7 @@ class TestForAllEvaluation(unittest.TestCase):
     # Since the variable 'unused' in the inner formula, 
     # the result will be the evaluation of the inner formula
     def test_forall_unused_var(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAll(Var("unused"), action)
 
         log ="""
@@ -42,7 +61,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
     def test_forall_single_var_true(self):
 
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAll(Var("n1"), action)
 
         log ="""# 
@@ -63,8 +82,8 @@ class TestForAllEvaluation(unittest.TestCase):
         self.assertTrue(result)
 
     def test_forall_single_var_true_2_actions(self):
-        action1 = Action(ActionType.Lookup, Interval("i1"), [Var("n1"), Var("k")], [Var("n1"), Var("v")])
-        action2 = Action(ActionType.Join, Interval("i2"), Var("n2"), [])
+        action1 = Action(ActionType.LOOKUP, Interval("i1"), [Var("n1"), Var("k")], [Var("n1"), Var("v")])
+        action2 = Action(ActionType.JOIN, Interval("i2"), Var("n2"), [])
         formula = ForAll(Var("n1"), And(action1, action2))
 
         log = """
@@ -92,7 +111,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
     def test_forall_single_var_false(self):
 
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAll(Var("n1"), action)
 
         log ="""# 
@@ -113,7 +132,7 @@ class TestForAllEvaluation(unittest.TestCase):
         self.assertFalse(result)
 
     def test_forall_single_var_false_2_occurences(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAll(Var("n1"), action)
 
         log ="""
@@ -138,7 +157,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
     def test_forall_multiple_var_true(self):
 
-        action = Action(ActionType.Store, Interval("i1"), [Var("n1"), Var("k1"), Var("v1")], Var("y1"))
+        action = Action(ActionType.STORE, Interval("i1"), [Var("n1"), Var("k1"), Var("v1")], Var("y1"))
         formula = ForAll([Var("n1"), Var("k1"), Var("v1"), Var("y1")], action)
 
         log ="""# 
@@ -162,7 +181,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
     def test_forall_multiple_var_false(self):
 
-        action = Action(ActionType.Store, Interval("i1"), [Var("n1"), Var("k1"), Var("v1")], Var("y1"))
+        action = Action(ActionType.STORE, Interval("i1"), [Var("n1"), Var("k1"), Var("v1")], Var("y1"))
         formula = ForAll([Var("n1"), Var("k1"), Var("v1"), Var("y1")], action)
 
         log ="""# 
@@ -179,8 +198,8 @@ class TestForAllEvaluation(unittest.TestCase):
 
         interval_store = {"i1": IntervalValue(0, 1)}
 
-        trace.append_event(BeginEvent(ActionType.Lookup,["test", "test"], "id1"))
-        trace.append_event(EndEvent(ActionType.Lookup, ["test", "test"], "id1"))
+        trace.append_event(BeginEvent(ActionType.LOOKUP,["test", "test"], "id1"))
+        trace.append_event(EndEvent(ActionType.LOOKUP, ["test", "test"], "id1"))
 
 
         result = formula.evaluate(trace, var_store, interval_store)
@@ -192,7 +211,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
 class TestExistsEvaluation(unittest.TestCase):
     def test_exists_empty_trace(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = Exists(Var("n1"), action)
 
         trace = Trace()
@@ -206,7 +225,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
 
     def test_exists_unused_var(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = Exists(Var("unused"), action)
 
         log ="""
@@ -223,7 +242,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
     def test_exists_single_var_true(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("n1")], [])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("n1")], [])
         formula = Exists(Var("n1"), action)
 
 
@@ -246,7 +265,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
     def test_exists_single_var_false(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("n1")], [])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("n1")], [])
         formula = Exists(Var("n1"), action)
 
 
@@ -267,7 +286,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
     def test_exists_multiple_var_true(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n2")])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n2")])
         formula = Exists([Var("n1"), Var("k1"), Var("n2")], action)
 
 
@@ -288,7 +307,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
     def test_exists_multiple_var_true_equal_vars(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n3")])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n3")])
         formula = Exists([Var("n1"), Var("k1"), Var("n2"), Var("n3")], And(action,  Equal(Var("n2"), Var("n3"))))
 
         log ="""
@@ -308,7 +327,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
     def test_exists_multiple_var_false(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n2")])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n2")])
         formula = Exists([Var("n1"), Var("k1"), Var("n2")], action)
 
 
@@ -329,7 +348,7 @@ class TestExistsEvaluation(unittest.TestCase):
 
     def test_exists_multiple_var_false_equal_vars(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n3")])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("k1")], [Var("n2"), Var("n3")])
         formula = Exists([Var("n1"), Var("k1"), Var("n2"), Var("n3")], And(action,  Equal(Var("n2"), Var("n3"))))
 
         log ="""

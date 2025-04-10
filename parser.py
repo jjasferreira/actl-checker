@@ -93,8 +93,8 @@ class Transformer(Transformer):
             raise ValueError(f"Unknown relation {items[0]}")
 
     def action_type(self, items):
-        if items[0].capitalize() in ActionType.__members__:
-            return ActionType[items[0].capitalize()]
+        if ActionType.has_value(items[0]):
+            return ActionType(items[0])
         else:
             raise ValueError(f"Unknown action type {items[0].capitalize()}")
     

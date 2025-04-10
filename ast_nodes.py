@@ -10,17 +10,34 @@ VarCollection : TypeAlias = dict[tuple["ActionType", int], list[str]]
 
 
 class ActionType(Enum):
-    Lookup = 1
-    Store = 2
-    FindNode = 3
-    Join = 4
-    Leave = 5
-    Fail = 6
-    Ideal = 7
-    Stable = 8
-    ReadOnly = 9
-    Member = 10
-    Responsible = 11
+    LOOKUP = "LOOKUP"
+    STORE = "STORE"
+    FINDNODE = "FINDNODE"
+    JOIN = "JOIN"
+    LEAVE = "LEAVE"
+    FAIL = "FAIL"
+    IDEAL = "IDEAL"
+    STABLE = "STABLE"
+    READONLY = "READONLY"
+    MEMBER = "MEMBER"
+    RESPONSIBLE = "RESPONSIBLE"
+
+    @classmethod
+    def has_value(cls, value):
+        return value.upper() in cls._value2member_map_ 
+
+    @classmethod
+    def _missing_(cls, value):
+        if not isinstance(value, str):
+            return None
+
+        value = value.upper()
+        for member in cls:
+            if member.value == value:
+                return member
+
+        return None
+
 
 class Event(ABC):
     @abstractmethod

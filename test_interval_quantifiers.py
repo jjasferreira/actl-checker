@@ -6,7 +6,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
 
     def test_forall_empty_trace(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("i1"), action)
 
         trace = Trace()
@@ -24,7 +24,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
     # Since the variable 'unused' in the inner formula, 
     # the result will be the evaluation of the inner formula
     def test_forall_unused_interval(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("unused"), action)
 
         log ="""
@@ -41,7 +41,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
     def test_forall_true(self):
 
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
@@ -64,7 +64,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
     def test_forall_true_2_intervals(self):
 
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
@@ -89,7 +89,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
     def test_forall_false(self):
 
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
@@ -108,7 +108,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
     def test_forall_false_2_intervals(self):
 
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
@@ -130,7 +130,7 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
 class TestExistsIntervalEvaluation(unittest.TestCase):
     def test_exists_empty_trace(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ExistsInterval(Interval("i1"), action)
 
         trace = Trace()
@@ -144,7 +144,7 @@ class TestExistsIntervalEvaluation(unittest.TestCase):
 
 
     def test_exists_unused_interval(self):
-        action = Action(ActionType.Join, Interval("i1"), Var("n1"), [])
+        action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ExistsInterval(Interval("unused"), action)
 
         log ="""
@@ -161,7 +161,7 @@ class TestExistsIntervalEvaluation(unittest.TestCase):
 
     def test_exists_true(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("n1")], [])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("n1")], [])
         formula = ExistsInterval(Interval("i1"), action)
 
 
@@ -185,7 +185,7 @@ class TestExistsIntervalEvaluation(unittest.TestCase):
 
     def test_exists_false(self):
 
-        action = Action(ActionType.FindNode, Interval("i1"), [Var("n1"), Var("n1")], [])
+        action = Action(ActionType.FINDNODE, Interval("i1"), [Var("n1"), Var("n1")], [])
         formula = ExistsInterval(Interval("i1"), action)
 
 
