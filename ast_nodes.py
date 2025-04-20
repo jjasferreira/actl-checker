@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
 from typing import Any, TypeAlias
-
+from datetime import datetime
 import sys
 
 IntervalCollection : TypeAlias = dict["ActionType", list["IntervalValue"]]
@@ -41,33 +41,42 @@ class ActionType(Enum):
 
 class Event(ABC):
     @abstractmethod
-    def __init__(self, action_type : ActionType, values, id):
+    def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
         self.action_type = action_type
         self.values = values if isinstance(values, list) else [values]
         self.id = id
+        self.time = time
+
+    def get_time(self):
+        assert self.time is not None, f"Event.get_time(): Event time is None for {self}"
+        return self.time
 
     def matches(self, other):
-        if not isinstance(other, Event):
+        if type(self) != type(other):
             return False
         else:
             return self.action_type == other.action_type and self.values == other.values
 
-class BeginEvent(Event):
-    def __init__(self, action_type : ActionType, values : list[str], id):
-        super().__init__(action_type, values, id)
 
     def __repr__(self):
-        return f"BeginEvent({self.id}, {self.action_type}, {self.values})"
+        return f"({self.time}, {self.id}, {self.action_type}, {self.values})"
+
+class BeginEvent(Event):
+    def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
+        super().__init__(action_type, values, id, time)
+
+    def __repr__(self):
+        return f"BeginEvent{super().__repr__()}"
 
 class EndEvent(Event):
-    def __init__(self, action_type : ActionType, values, id ):
-        super().__init__(action_type, values, id)
+    def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
+        super().__init__(action_type, values, id, time)
 
     def __repr__(self):
-        return f"EndEvent({self.id}, {self.action_type}, {self.values})"
+        return f"EndEvent{super().__repr__()}"
 
 class Trace:
-    def __init__(self, events : list[Event] | None = None, 
+    def __init__(self, events : list[list[Event]] | None = None, 
                  intervals : IntervalCollection | None = None, 
                  inputs : VarCollection | None = None,
                  outputs : VarCollection | None = None):
@@ -89,8 +98,15 @@ class Trace:
     def __len__(self) -> int:
         return len(self.events)
 
-    def append_event(self, event : Event):
-        self.events.append(event)
+    def insert_event(self, event : Event) -> int:
+        if len(self.events) == 0 or self.events[-1][0].get_time() < event.get_time():
+            self.events.append([event])
+        else:
+            assert self.events[-1][0].get_time() == event.get_time(), f"Trace events not ordered: {self.events[-1][0].get_time()} < {event.get_time()}\nlast event: {self.events[-1][0]}\n inserting: {event}"
+
+            self.events[-1].append(event)
+
+        return len(self.events) - 1
 
     def insert_interval(self, action_type : ActionType, interval_value: "IntervalValue"):
         # TODO: use defaultdict or setdefault?
@@ -121,16 +137,23 @@ class Trace:
         if t < 0 or t >= len(self.events):
             return None
 
-        candidate = self.events[t]
-        if candidate.matches(event):
-            return candidate
-        else:
-            return None
+        for candidate in self.events[t]:
+            if candidate.matches(event):
+                return candidate
+        return None
 
     def __repr__(self):
-        return  f"Trace(Events: {self.events};\nInputs: {self.inputs};\nOutputs: {self.outputs};\nIntervals: {self.intervals})"
+        events = ""
+        for (i, event_list) in enumerate(self.events):
+            events += f"\nInstant {i}: "
+            for event in event_list:
+                events += f"\n\t{event}"
 
+        outputs = "\n".join([f"{action_type}: {values}" for action_type, values in self.outputs.items()])
+        inputs = "\n".join([f"{action_type}: {values}" for action_type, values in self.inputs.items()])
+        intervals = "\n".join([f"{action_type}: {values}" for action_type, values in self.intervals.items()])
 
+        return f"Trace(Events: {events};\nInputs: {inputs};\nOutputs: {outputs};\nIntervals: {intervals})"
 class Formula(ABC):
     @abstractmethod
     def evaluate(self, trace : Trace, store : dict[str, str], interval_store : "dict[str, IntervalValue]") -> Any:
@@ -478,8 +501,8 @@ class Action(Formula):
         bound_input = [x.evaluate(trace, var_store, interval_store) for x in self.input]
         bound_output = [x.evaluate(trace, var_store, interval_store) for x in self.output]
 
-        begin_event = BeginEvent(self.action_type, bound_input, None)
-        end_event = EndEvent(self.action_type, bound_output, None)
+        begin_event = BeginEvent(self.action_type, bound_input, None, None)
+        end_event = EndEvent(self.action_type, bound_output, None, None)
 
         completed_begin_event = trace.complete_event(begin_event, action_interval.begin)
 

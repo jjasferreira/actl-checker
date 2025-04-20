@@ -11,12 +11,11 @@ class TestForAllEvaluation(unittest.TestCase):
 
 
         log ="""
-         # 11:00, Lookup, id-000, node1
-         # 12:00, Join, id-001, node1
-         12:10, Join, id-002, node2, 
+         # 2000-01-01 11:00:00:00, Lookup, id-000, node1
+         # 2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, Join, id-002, node2, 
 """
         trace = parse_trace_string(log)
-        # trace = Trace()
 
         var_store = {}
         interval_store = {}
@@ -48,7 +47,7 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll(Var("unused"), action)
 
         log ="""
-         12:00, Join, id-001, node1
+         2000-01-01 12:00:00.00, Join, id-001, node1
 """
         trace = parse_trace_string(log)
 
@@ -65,11 +64,11 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll(Var("n1"), action)
 
         log ="""# 
-         12:00, Join, id-001, node1
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
          #
-         12:20, Store, id-002, node2, key, value
-         12:30, ReplyStore, id-002, node3
+         2000-01-01 12:00:20.00, Store, id-002, node2, key, value
+         2000-01-01 12:00:30.00, ReplyStore, id-002, node3
 """
 
         trace = parse_trace_string(log)
@@ -87,14 +86,14 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll(Var("n1"), And(action1, action2))
 
         log = """
-        12:00, Lookup, id-001, node1, key 
-        12:10, ReplyLookup, id-001, node1, value
+        2000-01-01 12:00:00.00, Lookup, id-001, node1, key 
+        2000-01-01 12:00:10.00, ReplyLookup, id-001, node1, value
         
-        12:20, Join, id-002, node2
-        12:30, ReplyJoin, id-002
+        2000-01-01 12:00:20.00, Join, id-002, node2
+        2000-01-01 12:00:30.00, ReplyJoin, id-002
 
-        12:40, Lookup, id-003, node1, key 
-        12:50, ReplyLookup, id-003, node1, value
+        2000-01-01 12:00:40.00, Lookup, id-003, node1, key 
+        2000-01-01 12:00:50.00, ReplyLookup, id-003, node1, value
 """
 
         trace = parse_trace_string(log)
@@ -115,11 +114,11 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll(Var("n1"), action)
 
         log ="""# 
-         12:00, Join, id-001, node1
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
          #
-         12:00, Join, id-002, node2 
-         12:10, ReplyJoin, id-002, node2
+         2000-01-01 12:00:20.00, Join, id-002, node2 
+         2000-01-01 12:00:30.00, ReplyJoin, id-002, node2
 """
 
         trace = parse_trace_string(log)
@@ -136,14 +135,14 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll(Var("n1"), action)
 
         log ="""
-         12:00, Join, id-001, node1
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
 
-         12:20, Join, id-002, node1 
-         12:30, ReplyJoin, id-002, node1
+         2000-01-01 12:00:20.00, Join, id-002, node1 
+         2000-01-01 12:00:30.00, ReplyJoin, id-002, node1
         
-         12:40, Join, id-003, node2 
-         12:50, ReplyJoin, id-003, node2
+         2000-01-01 12:00:40.00, Join, id-003, node2 
+         2000-01-01 12:00:50.00, ReplyJoin, id-003, node2
 """
 
         trace = parse_trace_string(log)
@@ -161,11 +160,11 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll([Var("n1"), Var("k1"), Var("v1"), Var("y1")], action)
 
         log ="""# 
-         12:00, Store, id-001, node1, key1, value1
-         12:10, ReplyStore, id-001, node2
+         2000-01-01 12:00:00.00, Store, id-001, node1, key1, value1
+         2000-01-01 12:00:10.00, ReplyStore, id-001, node2
          #
-         12:20, Store, id-002, node1, key1, value1
-         12:30, ReplyStore, id-002, node2
+         2000-01-01 12:00:20.00, Store, id-002, node1, key1, value1
+         2000-01-01 12:00:30.00, ReplyStore, id-002, node2
 """
 
         trace = parse_trace_string(log)
@@ -185,11 +184,11 @@ class TestForAllEvaluation(unittest.TestCase):
         formula = ForAll([Var("n1"), Var("k1"), Var("v1"), Var("y1")], action)
 
         log ="""# 
-         12:00, Store, id-001, node1, key1, value1
-         12:10, ReplyStore, id-001, node2
+         2000-01-01 12:00:00.00, Store, id-001, node1, key1, value1
+         2000-01-01 12:00:10.00, ReplyStore, id-001, node2
          #
-         12:20, Store, id-002, node2, key1, value2
-         12:30, ReplyStore, id-002, node3
+         2000-01-01 12:00:20.00, Store, id-002, node2, key1, value2
+         2000-01-01 12:00:30.00, ReplyStore, id-002, node3
 """
 
         trace = parse_trace_string(log)
@@ -198,12 +197,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
         interval_store = {"i1": IntervalValue(0, 1)}
 
-        trace.append_event(BeginEvent(ActionType.LOOKUP,["test", "test"], "id1"))
-        trace.append_event(EndEvent(ActionType.LOOKUP, ["test", "test"], "id1"))
-
-
         result = formula.evaluate(trace, var_store, interval_store)
-
 
         self.assertFalse(result)
 
@@ -229,7 +223,7 @@ class TestExistsEvaluation(unittest.TestCase):
         formula = Exists(Var("unused"), action)
 
         log ="""
-         12:00, Join, id-001, node1
+         2000-01-01 12:00:00.00, Join, id-001, node1
 """
         trace = parse_trace_string(log)
 
@@ -247,10 +241,10 @@ class TestExistsEvaluation(unittest.TestCase):
 
 
         log ="""
-         12:00, FindNode, id-001, node1, node1
-         12:10, ReplyFindNode, id-001,
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, node1
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001,
          
-         12:20, FindNode, id-002, node2, key
+         2000-01-01 12:00:20.00, FindNode, id-002, node2, key
 """
 
         trace = parse_trace_string(log)
@@ -270,9 +264,9 @@ class TestExistsEvaluation(unittest.TestCase):
 
 
         log ="""
-         12:00, FindNode, id-001, node1, node2
-         12:10, ReplyFindNode, id-001,
-         12:20, Lookup, id-002, node2, key
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, node2
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001,
+         2000-01-01 12:00:20.00, Lookup, id-002, node2, key
 """
 
         trace = parse_trace_string(log)
@@ -291,9 +285,9 @@ class TestExistsEvaluation(unittest.TestCase):
 
 
         log ="""
-         12:00, FindNode, id-001, node1, key
-         12:10, ReplyFindNode, id-001, node2, node2
-         12:20, Lookup, id-002, node2, key
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, key
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001, node2, node2
+         2000-01-01 12:00:20.00, Lookup, id-002, node2, key
 """
 
         trace = parse_trace_string(log)
@@ -311,9 +305,9 @@ class TestExistsEvaluation(unittest.TestCase):
         formula = Exists([Var("n1"), Var("k1"), Var("n2"), Var("n3")], And(action,  Equal(Var("n2"), Var("n3"))))
 
         log ="""
-         12:00, FindNode, id-001, node1, key
-         12:10, ReplyFindNode, id-001, node2, node2
-         12:20, Lookup, id-002, node2, key
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, key
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001, node2, node2
+         2000-01-01 12:00:20.00, Lookup, id-002, node2, key
 """
 
         trace = parse_trace_string(log)
@@ -332,9 +326,9 @@ class TestExistsEvaluation(unittest.TestCase):
 
 
         log ="""
-         12:00, FindNode, id-001, node1, key
-         12:10, ReplyFindNode, id-001, node2, node3
-         12:20, Lookup, id-002, node2, key
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, key
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001, node2, node3
+         2000-01-01 12:00:20.00, Lookup, id-002, node2, key
 """
 
         trace = parse_trace_string(log)
@@ -352,9 +346,9 @@ class TestExistsEvaluation(unittest.TestCase):
         formula = Exists([Var("n1"), Var("k1"), Var("n2"), Var("n3")], And(action,  Equal(Var("n2"), Var("n3"))))
 
         log ="""
-         12:00, FindNode, id-001, node1, key
-         12:10, ReplyFindNode, id-001, node2, node3
-         12:20, Lookup, id-002, node2, key
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, key
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001, node2, node3
+         2000-01-01 12:00:20.00, Lookup, id-002, node2, key
 """
 
         trace = parse_trace_string(log)

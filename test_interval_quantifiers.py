@@ -21,14 +21,14 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
 
     # TEST:
     # Test case for an unused variable in the 'ForAll' quantifier.
-    # Since the variable 'unused' in the inner formula, 
+    # Since the variable 'unused' is unused in the inner formula, 
     # the result will be the evaluation of the inner formula
     def test_forall_unused_interval(self):
         action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
         formula = ForAllInterval(Interval("unused"), action)
 
         log ="""
-         12:00, Join, id-001, node1
+         2000-01-01 12:00:00.00, Join, id-001, node1
 """
         trace = parse_trace_string(log)
 
@@ -45,11 +45,11 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
-         12:00, Join, id-001, node1
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
          #
-         12:20, Store, id-002, node2, key, value
-         12:30, ReplyStore, id-002, node3
+         2000-01-01 12:00:20.00, Store, id-002, node2, key, value
+         2000-01-01 12:00:30.00, ReplyStore, id-002, node3
 """
 
         trace = parse_trace_string(log)
@@ -68,14 +68,14 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
-         12:00, Join, id-001, node1
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
          #
-         12:20, Store, id-002, node2, key, value
-         12:30, ReplyStore, id-002, node3
+         2000-01-01 12:00:20.00, Store, id-002, node2, key, value
+         2000-01-01 12:00:30.00, ReplyStore, id-002, node3
 
-         12:40, Join, id-003, node1
-         12:50, ReplyJoin, id-003
+         2000-01-01 12:00:40.00, Join, id-003, node1
+         2000-01-01 12:00:50.00, ReplyJoin, id-003
 """
 
         trace = parse_trace_string(log)
@@ -93,8 +93,8 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
-         12:00, Join, id-001, node2
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node2
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
 """
 
         trace = parse_trace_string(log)
@@ -112,11 +112,11 @@ class TestForAllIntervalEvaluation(unittest.TestCase):
         formula = ForAllInterval(Interval("i1"), action)
 
         log ="""# 
-         12:00, Join, id-001, node1
-         12:10, ReplyJoin, id-001
+         2000-01-01 12:00:00.00, Join, id-001, node1
+         2000-01-01 12:00:10.00, ReplyJoin, id-001
          #
-         12:00, Join, id-002, node2 
-         12:10, ReplyJoin, id-002, node2
+         2000-01-01 12:00:20.00, Join, id-002, node2 
+         2000-01-01 12:00:30.00, ReplyJoin, id-002, node2
 """
 
         trace = parse_trace_string(log)
@@ -148,7 +148,7 @@ class TestExistsIntervalEvaluation(unittest.TestCase):
         formula = ExistsInterval(Interval("unused"), action)
 
         log ="""
-         12:00, Join, id-001, node1
+         2000-01-01 12:00:00.00, Join, id-001, node1
 """
         trace = parse_trace_string(log)
 
@@ -166,11 +166,11 @@ class TestExistsIntervalEvaluation(unittest.TestCase):
 
 
         log ="""
-         12:00, FindNode, id-001, node1, node1
-         12:10, ReplyFindNode, id-001,
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, node1
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001,
 
-         12:20, FindNode, id-002, node2, key
-         12:30, ReplyFindNode, id-002, node2
+         2000-01-01 12:00:20.00, FindNode, id-002, node2, key
+         2000-01-01 12:00:30.00, ReplyFindNode, id-002, node2
 """
 
         trace = parse_trace_string(log)
@@ -190,8 +190,8 @@ class TestExistsIntervalEvaluation(unittest.TestCase):
 
 
         log ="""
-         12:00, FindNode, id-001, node1, node2
-         12:10, ReplyFindNode, id-001,
+         2000-01-01 12:00:00.00, FindNode, id-001, node1, node2
+         2000-01-01 12:00:10.00, ReplyFindNode, id-001,
 """
 
         trace = parse_trace_string(log)

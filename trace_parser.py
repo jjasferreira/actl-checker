@@ -1,6 +1,8 @@
 import os
 import sys
 import argparse
+from datetime import datetime
+
 from ast_nodes import (
     Trace,
     BeginEvent,
@@ -58,6 +60,8 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                 time, event_type, event_id = components[0:3]
                 values = components[3:]
 
+                date =  datetime.strptime(time, "%Y-%m-%d %H:%M:%S.%f")
+
                 if "Remove" in event_type:
                     #TODO:
                     # Convert to store
@@ -81,9 +85,8 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     return
 
 
-                event = None
                 if not (event_type.startswith("Reply") or "End" in event_type):
-                    event = BeginEvent(action_type, values, event_id)
+                    event = BeginEvent(action_type, values, event_id, date)
                     interval_value = IntervalValue(len(trace))
                     ongoing_actions[event_id] = interval_value
 
@@ -92,28 +95,30 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     for (i, value) in enumerate(values):
                         trace.insert_input(action_type, i, value)
 
+                    trace.insert_event(event)
+
 
                 if action_type == ActionType.FAIL or event_type.startswith("Reply") or "End" in event_type:
-                    event = EndEvent(action_type, values, event_id)
+                    if action_type == ActionType.FAIL:
+                        values = []
+
+                    event = EndEvent(action_type, values, event_id, date)
 
                     interval_value = ongoing_actions.pop(event_id, None)
 
                     if interval_value is None:
                         raise MissingIntervalError(line, event_id)
 
-                    success =  interval_value.complete_end(len(trace))
+                    for (i, value) in enumerate(values):
+                        trace.insert_output(action_type, i, value)
+
+                    position = trace.insert_event(event)
+
+                    success =  interval_value.complete_end(position)
 
                     if not success:
                         raise DuplicateEndEventError(line, event_id, interval_value)
 
-
-                    for (i, value) in enumerate(values):
-                        trace.insert_output(action_type, i, value)
-
-                # NOTE: Event is never None, assert just for type checking
-                assert event is not None
-
-                trace.append_event(event)
 
 def parse_trace_string(log : str) -> Trace:
 
