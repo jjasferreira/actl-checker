@@ -5,28 +5,22 @@ from ast_nodes import *
 
 grammar = r"""
     ?start: expression
-    ?expression: action
-               | equal
-               | not_
-               | and_
+    ?expression: not_
                | or_
+               | and_
                | implies
                | forall
-               | forallinterval
                | exists
-               | existsinterval
+               | equal
                | relation
 
-    ?action: "(" action_type interval any_variables any_variables ")"
-    ?equal: "(" "equal" variable variable ")"
     ?not_: "(" "not" expression ")"
-    ?and_: "(" "and" expression expression ")"
     ?or_: "(" "or" expression expression ")"
+    ?and_: "(" "and" expression expression ")"
     ?implies: "(" "implies" expression expression ")"
-    ?forall: "(" "forall" some_variables expression ")"
-    ?forallinterval: "(" "forallinterval" interval expression ")"
-    ?exists: "(" "exists" some_variables expression ")"
-    ?existsinterval: "(" "existsinterval" interval expression ")"
+    ?forall: "(" "forall" action_type interval any_variables any_variables expression ")"
+    ?exists: "(" "exists" action_type interval any_variables any_variables expression ")"
+    ?equal: "(" "equal" variable variable ")"
     ?relation: "(" relation_type interval interval ")"
 
     ?action_type: CNAME -> action_type
@@ -44,35 +38,27 @@ grammar = r"""
 parser = Lark(grammar, start="start")
 
 class Transformer(Transformer):
-    def action(self, items):
-        return Action(items[0], items[1], items[2], items[3])
-
-    def equal(self, items):
-        return Equal(items[0], items[1])
     
     def not_(self, items):
         return Not(items[0])
 
+    def or_(self, items):
+        return Or(items[0], items[1])
+
     def and_(self, items):
         return And(items[0], items[1])
 
-    def or_(self, items):
-        return Or(items[0], items[1])
-    
     def implies(self, items):
         return Implies(items[0], items[1])
-    
+
     def forall(self, items):
-        return ForAll(items[0], items[1])
-    
-    def forallinterval(self, items):
-        return ForAllInterval(items[0], items[1])
+        return ForAll(Action(items[0], items[1], items[2], items[3]), items[1])
 
     def exists(self, items):
-        return Exists(items[0], items[1])
-    
-    def existsinterval(self, items):
-        return ExistsInterval(items[0], items[1])
+        return Exists(Action(items[0], items[1], items[2], items[3]), items[1])
+
+    def equal(self, items):
+        return Equal(items[0], items[1])
     
     def relation(self, items):
         if items[0] == "before":
@@ -101,11 +87,11 @@ class Transformer(Transformer):
     def relation_type(self, items):
         pass
 
-    def variable(self, items):
-        return Var(items[0])
-    
     def interval(self, items):
         return Interval(items[0])
+
+    def variable(self, items):
+        return Var(items[0])
 
     def any_variables(self, items):
         return items
@@ -136,22 +122,17 @@ def parse_ast(input : str) -> Formula:
 if __name__ == "__main__":
 
     input1 = """
-    (forallinterval i
-        (forall (x y)
-            (implies
-                (lookup i (x) (y))
-                (existsinterval j
+    (forall lookup i2 (k2) (v2)
+        (exists store i1 (k1 v1) ()
+            (and
+                (before i1 i2)
                 (and
-                    (store j (x y) ())
-                    (before j i)
-                )
+                    (equal k1 k2)
+                    (equal v1 v2)
                 )
             )
         )
-    )"""
-
-    input2 = """
-    (lookup j (x y z) (a b))
+    )
     """
 
     DEBUG = True
