@@ -128,8 +128,30 @@ class Trace:
     def get_outputs(self,  action_type : ActionType, index : int) -> list[str]:
         return self.outputs[(action_type, index)]
 
-    def get_interval(self,  action_type : ActionType) -> list["IntervalValue"]:
+    def get_intervals(self,  action_type : ActionType) -> list["IntervalValue"]:
         return self.intervals[action_type]
+
+    def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
+        actions = []
+
+        intervals = self.intervals[action_type]
+
+        for interval in intervals:
+            for event in self.events[interval.begin]:
+                if isinstance(event, BeginEvent) and event.action_type == action_type:
+                    inputs = event.values
+                    outputs = []
+                    if interval.end != float("inf"):
+                        assert type(interval.end) == int, f"Interval end boundary should be an index of Trace.events: \"{interval.end}\""
+                        for end_event in self.events[interval.end]:
+                            if isinstance(event, BeginEvent) and end_event.id == event.id:
+                                outputs = end_event.values
+                                break
+
+                    actions.append((interval, inputs, outputs))
+
+        return actions
+
 
     def complete_event(self, event : Event, t : int) -> None | Event: 
         assert event.id is None
@@ -154,6 +176,7 @@ class Trace:
         intervals = "\n".join([f"{action_type}: {values}" for action_type, values in self.intervals.items()])
 
         return f"Trace(Events: {events};\nInputs: {inputs};\nOutputs: {outputs};\nIntervals: {intervals})"
+
 class Formula(ABC):
     @abstractmethod
     def evaluate(self, trace : Trace, store : dict[str, str], interval_store : "dict[str, IntervalValue]") -> Any:
@@ -251,7 +274,7 @@ class Not(UnaryExpr):
 
 class BinaryExpr(Formula, ABC):
     @abstractmethod
-    def __init__(self, left, right):
+    def __init__(self, left : Formula, right : Formula):
         self.left = left
         self.right = right
 
@@ -399,87 +422,78 @@ class ForAll(Quantifier):
 
 
 
-class IntervalQuantifier(Formula, ABC):
+class ActionQuantifier(Formula, ABC):
     @abstractmethod
-    def __init__(self, interval : Interval,  expr : Formula):
-        self.interval = interval
+    def __init__(self, action : "Action", expr : Formula):
+        self.action = action
+        # self.vars = vars if isinstance(vars, list) else [vars]
         self.expr = expr
+    
+        assert isinstance(action, Action), f"Expected Action, but got '{action}' of {type(action)}"
 
-
-    def get_possible_values(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], var: Var) -> list[str]:
-        return self.expr.get_possible_values(trace, store, interval_store, var)
+    # def get_possible_values(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], var: Var) -> list[str]:
+    #     if var in self.vars:
+    #         return []
+    #     else:
+    #         return self.expr.get_possible_values(trace, store, interval_store, var)
 
 
     def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
                             interval : "Interval") -> list["Action"]:
-        if interval == self.interval:
-            return []
-        else:
-            return self.expr.get_possible_actions(trace, store, interval_store, interval)
-
+        return self.expr.get_possible_actions(trace, store, interval_store, interval)
 
     def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
                         short_circuit_on : bool):
 
+            # action = possible_actions[0]
+            action = self.action
+            possible_actions = trace.get_actions(action.get_type())
 
+            for (interval_value, inputs, outputs) in possible_actions:
 
-            possible_actions = self.expr.get_possible_actions(trace, var_store, interval_store, self.interval)
-            
-    
-            #TODO: Double check if it is handled correctly:
-            # if no possible values exist then
-            # return False for Exists
-            # evaluate the expression for ForAll 
-            if not possible_actions:
-                print(f"Warning: No possible actions found for {self.interval}.", file=sys.stderr)
+                #TODO: Mismatched number of inputs and outputs between formula and trace action
+                if len(inputs) < len(action.input) or len(outputs) < len(action.output):
+                    print(f"Warning: Possible action {action} has more inputs or outputs than action in trace.", file=sys.stderr)
+                    continue
 
-                if short_circuit_on: # == True
-                    return False
-                
-                result = self.expr.evaluate(trace, var_store, interval_store)
+                new_interval_store = interval_store.copy()
+                new_interval_store[action.interval.label] = interval_value
 
-                return result
+                new_var_store = var_store.copy()
+                for (var, value) in zip(action.input, inputs):
+                    assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
+                    new_var_store[var.label] = value
 
+                for (var, value) in zip(action.output, outputs):
+                    assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
+                    new_var_store[var.label] = value
 
-            # TODO:
-            # Currently assuming at most one possible action
-            assert len(possible_actions) == 1, f"Currently assuming at most one possible action, but found {len(possible_actions)} for {self.interval}."
-
-            action = possible_actions[0]
-            possible_intervals = trace.get_interval(action.get_type())
-
-            for interval_value in possible_intervals:
-                new_store = interval_store.copy()
-                new_store[self.interval.label] = interval_value
-
-                result = self.expr.evaluate(trace, var_store, new_store)
+                result = self.expr.evaluate(trace, new_var_store, new_interval_store)
                 if result == short_circuit_on:
                     return short_circuit_on
-            else:
-                return not short_circuit_on
+            
+            return not short_circuit_on
 
 
-class ExistsInterval(IntervalQuantifier):
-    def __init__(self, interval : Interval,  expr : Formula):
-        super().__init__(interval, expr)
-
+class ExistsAction(ActionQuantifier):
+    def __init__(self, action : "Action", expr : Formula):
+        super().__init__(action, expr)
+    
     def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
         return self.evaluate_naively(trace, var_store, interval_store, True)
 
     def __repr__(self):
-        return f"∃_i {self.interval}. ({self.expr})"
+        return f"∃({self.action}). ({self.expr})"
 
-class ForAllInterval(IntervalQuantifier):
-    def __init__(self, interval : Interval,  expr : Formula):
-        super().__init__(interval, expr)
+class ForAllAction(ActionQuantifier):
+    def __init__(self, action : "Action", expr : Formula):
+        super().__init__(action, expr)
 
     def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
         return self.evaluate_naively(trace, var_store, interval_store, False)
 
     def __repr__(self):
-        return f"∀_i {self.interval}. ({self.expr})"
-
-
+        return f"∀({self.action}). ({self.expr})"
 
 class Action(Formula):
     def __init__(self, action_type: ActionType, interval : Interval, inputs : Var | list[Var], outputs : Var | list[Var]):

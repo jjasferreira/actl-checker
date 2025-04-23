@@ -52,10 +52,10 @@ class Transformer(Transformer):
         return Implies(items[0], items[1])
 
     def forall(self, items):
-        return ForAll(Action(items[0], items[1], items[2], items[3]), items[1])
+        return ForAllAction(Action(items[0], items[1], items[2], items[3]), items[4])
 
     def exists(self, items):
-        return Exists(Action(items[0], items[1], items[2], items[3]), items[1])
+        return ExistsAction(Action(items[0], items[1], items[2], items[3]), items[4])
 
     def equal(self, items):
         return Equal(items[0], items[1])

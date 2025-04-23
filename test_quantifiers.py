@@ -26,7 +26,7 @@ class TestForAllEvaluation(unittest.TestCase):
 
     def test_forall_empty_trace(self):
         action = Action(ActionType.JOIN, Interval("i1"), Var("n1"), [])
-        formula = ForAllInterval(Interval("i1"), ForAll(Var("n1"), action))
+        formula = ForAllAction(action, ForAll(Var("n2"), Equal(Var("n1"), Var("n2"))))
 
         trace = Trace()
 
