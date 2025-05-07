@@ -11,6 +11,7 @@ from ast_nodes import (
     IntervalValue,
 )
 
+EMPTY_VALUE = "no_value"
 
 class TraceParsingError(Exception):
     def __init__(self,  line : str, event_id: str,):
@@ -101,6 +102,9 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                 if action_type == ActionType.FAIL or event_type.startswith("Reply") or "End" in event_type:
                     if action_type == ActionType.FAIL:
                         values = []
+
+                    if action_type == ActionType.LOOKUP and len(values) == 1:
+                        values.append(EMPTY_VALUE)
 
                     event = EndEvent(action_type, values, event_id, date)
 

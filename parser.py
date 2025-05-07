@@ -27,12 +27,14 @@ grammar = r"""
     ?relation_type: CNAME
     ?interval: CNAME -> interval
     ?variable: CNAME -> variable
+            | CONST -> const
     ?any_variables: "(" variable* ")"
     ?some_variables: "(" variable+ ")"
 
     %import common.CNAME
     %import common.WS
     %ignore WS
+    CONST: "'" CNAME
 """
 
 parser = Lark(grammar, start="start")
@@ -92,6 +94,9 @@ class Transformer(Transformer):
 
     def variable(self, items):
         return Var(items[0])
+
+    def const(self, items : list[str]):
+        return Constant(items[0].strip("\'"))
 
     def any_variables(self, items):
         return items

@@ -686,3 +686,13 @@ class Equals(IntervalPredicate):
 
     def __repr__(self):
         return f"Equals({self.left}, {self.right})"
+
+class Constant(Formula):
+    def __init__(self, label : str):
+        self.label = label
+    
+    def evaluate(self, _trace : Trace, _store, _interval_store) -> Any:
+        return self.label
+
+    def __repr__(self):
+        return f"Constant({self.label})"
