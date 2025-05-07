@@ -5,21 +5,29 @@ from ast_nodes import *
 
 grammar = r"""
     ?start: expression
-    ?expression: not_
-               | or_
-               | and_
-               | implies
-               | forall
-               | exists
-               | equal
-               | relation
 
-    ?not_: "(" "not" expression ")"
-    ?or_: "(" "or" expression expression ")"
-    ?and_: "(" "and" expression expression ")"
-    ?implies: "(" "implies" expression expression ")"
-    ?forall: "(" "forall" action_type interval any_variables any_variables expression ")"
-    ?exists: "(" "exists" action_type interval any_variables any_variables expression ")"
+    // Top-down precedence (lowest to highest)
+    ?expression: implication
+
+    ?implication: "(" "implies" expression expression ")"   -> implies
+                | disjunction
+
+    ?disjunction: "(" "or" expression expression ")"        -> or_
+                | conjunction
+
+    ?conjunction: "(" "and" expression expression ")"       -> and_
+                | negation
+
+    ?negation: "(" "not" expression ")"                     -> not_
+             | quantifier
+
+    ?quantifier: "(" "forall" action_type interval any_variables any_variables expression ")" -> forall
+               | "(" "exists" action_type interval any_variables any_variables expression ")" -> exists
+               | atom
+
+    ?atom: equal
+         | relation
+         | "(" expression ")"
     ?equal: "(" "equal" variable variable ")"
     ?relation: "(" relation_type interval interval ")"
 
