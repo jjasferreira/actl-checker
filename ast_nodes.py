@@ -47,11 +47,18 @@ class Event(ABC):
         self.id = id
         self.time = time
 
-    def get_time(self):
+    def get_time(self) -> datetime:
         assert self.time is not None, f"Event.get_time(): Event time is None for {self}"
         return self.time
 
-    def matches(self, other):
+    def get_id(self) -> str:
+        assert self.id is not None, f""
+        return self.id
+
+    def get_type(self) -> ActionType:
+        return self.action_type
+
+    def matches(self, other) -> bool:
         if type(self) != type(other):
             return False
         else:
@@ -267,10 +274,14 @@ class Not(UnaryExpr):
         super().__init__(expr)
 
     def evaluate(self, trace : Trace, store, interval_store):
-        return not self.expr.evaluate(trace, store, interval_store)
+        result = self.expr.evaluate(trace, store, interval_store)
+        
+        assert isinstance(result, bool), f"\"Not\" operator expected boolean result from {self.expr}, but got {result} of type {type(result)}"
+
+        return not result
 
     def __repr__(self):
-        return f"¬({self.expr})"
+        return f"¬{self.expr}"
 
 class BinaryExpr(Formula, ABC):
     @abstractmethod
@@ -296,7 +307,10 @@ class Equal(BinaryExpr):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
-        return self.left.evaluate(trace, store, interval_store) == self.right.evaluate(trace, store, interval_store)
+        left =  self.left.evaluate(trace, store, interval_store) 
+        right = self.right.evaluate(trace, store, interval_store)
+
+        return left == right
 
     def __repr__(self):
         return f"({self.left} == {self.right})"
@@ -326,7 +340,10 @@ class Implies(BinaryExpr):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
-        return not self.left.evaluate(trace, store, interval_store) or self.right.evaluate(trace, store, interval_store)
+        left = self.left.evaluate(trace, store, interval_store) 
+        right = self.right.evaluate(trace, store, interval_store)
+
+        return (not left) or right
 
     def __repr__(self):
         return f"({self.left} => {self.right})"
@@ -453,7 +470,7 @@ class ActionQuantifier(Formula, ABC):
 
                 #TODO: Mismatched number of inputs and outputs between formula and trace action
                 if len(inputs) < len(action.input) or len(outputs) < len(action.output):
-                    print(f"Warning: Possible action {action} has more inputs or outputs than action in trace.", file=sys.stderr)
+                    print(f"Warning: Possible action {action} has more inputs or outputs than action in trace: {interval_value, inputs, outputs}", file=sys.stderr)
                     continue
 
                 new_interval_store = interval_store.copy()
@@ -501,6 +518,12 @@ class Action(Formula):
         self.interval = interval
         self.input = inputs if isinstance(inputs, list) else [inputs]
         self.output = outputs if isinstance(outputs, list) else [outputs]
+
+        for var in self.input + self.output:
+            assert isinstance(var, Var), f"Expected Var, but got '{var}' of {type(var)}. During initialization of Action {self}."
+
+
+        assert isinstance(interval, Interval), f"Expected Interval, but got '{interval}' of {type(interval)}. During initialization of Action {self}."
     
     def get_type(self) -> ActionType:
         return self.action_type
@@ -574,6 +597,9 @@ class Action(Formula):
 class IntervalPredicate(Formula, ABC):
     @abstractmethod
     def __init__(self, left : Interval, right : Interval):
+        assert isinstance(left, Interval), f"Expected Interval, but got '{left}' of {type(left)}"
+        assert isinstance(right, Interval), f"Expected Interval, but got '{right}' of {type(right)}"
+
         self.left = left
         self.right = right
 
@@ -590,7 +616,7 @@ class Before(IntervalPredicate):
         return f"Before({self.left}, {self.right})"
 
 class Meets(IntervalPredicate):
-    def __init__(self, left, right):
+    def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
@@ -602,7 +628,7 @@ class Meets(IntervalPredicate):
         return f"Meets({self.left}, {self.right})"
 
 class Overlaps(IntervalPredicate):
-    def __init__(self, left, right):
+    def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
@@ -614,7 +640,7 @@ class Overlaps(IntervalPredicate):
         return f"Overlaps({self.left}, {self.right})"
 
 class Starts(IntervalPredicate):
-    def __init__(self, left, right):
+    def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
@@ -626,7 +652,7 @@ class Starts(IntervalPredicate):
         return f"Starts({self.left}, {self.right})"
 
 class During(IntervalPredicate):
-    def __init__(self, left, right):
+    def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
@@ -638,7 +664,7 @@ class During(IntervalPredicate):
         return f"During({self.left}, {self.right})"
 
 class Finishes(IntervalPredicate):
-    def __init__(self, left, right):
+    def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
@@ -650,7 +676,7 @@ class Finishes(IntervalPredicate):
         return f"Finishes({self.left}, {self.right})"
 
 class Equals(IntervalPredicate):
-    def __init__(self, left, right):
+    def __init__(self, left : Interval, right : Interval):
         super().__init__(left, right)
 
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
