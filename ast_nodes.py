@@ -315,25 +315,65 @@ class Equal(BinaryExpr):
     def __repr__(self):
         return f"({self.left} == {self.right})"
 
-class And(BinaryExpr):
-    def __init__(self, left, right):
-        super().__init__(left, right)
+
+class NAryExpr(Formula, ABC):
+    @abstractmethod
+    def __init__(self, *expressions : Formula):
+        assert len(expressions) > 1, f"\"{self.__class__.__name__}\" requires at least two expressions, but got {len(expressions)}"
+        self.expressions = expressions
+
+
+    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
+                            target_var : Var) -> list[str]:
+        possible_values = []
+
+        for expression in self.expressions:
+            possible_values.extend(expression.get_possible_values(trace, store, interval_store, target_var))
+
+        return possible_values
+
+    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
+                            interval : "Interval") -> list["Action"]:
+
+        possible_actions = []
+
+        for expression in self.expressions:
+            possible_actions.extend(expression.get_possible_actions(trace, store, interval_store, interval))
+
+        return possible_actions
+
+class And(NAryExpr):
+    def __init__(self, *expressions : Formula):
+        super().__init__(*expressions)
     
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
-        return self.left.evaluate(trace, store, interval_store) and self.right.evaluate(trace, store, interval_store)
+        for expression in self.expressions:
+            result = expression.evaluate(trace, store, interval_store)
+
+            assert isinstance(result, bool), f"\"And\" operator expected boolean result from {expression}, but got {result} of type {type(result)}"
+            
+            if not result:
+                return False
+
+        return True
 
     def __repr__(self):
-        return f"({self.left} ∧ {self.right})"
+        return " ∧ ".join(map(str, self.expressions))
 
-class Or(BinaryExpr):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-
+class Or(NAryExpr):
+    def __init__(self, *expressions : Formula):
+        super().__init__(*expressions)
+    
     def evaluate(self, trace : Trace, store, interval_store) -> Any:
-        return self.left.evaluate(trace, store, interval_store) or self.right.evaluate(trace, store, interval_store)
+        for expression in self.expressions:
+            result = expression.evaluate(trace, store, interval_store)
+            assert isinstance(result, bool), f"\"Or\" operator expected boolean result from {expression}, but got {result} of type {type(result)}"
+            if result:
+                return True
+        return False
 
     def __repr__(self):
-        return f"({self.left} v {self.right})"
+        return " v ".join(map(str, self.expressions))
 
 class Implies(BinaryExpr):
     def __init__(self, left, right):

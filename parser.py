@@ -12,10 +12,10 @@ grammar = r"""
     ?implication: "(" "implies" expression expression ")"   -> implies
                 | disjunction
 
-    ?disjunction: "(" "or" expression expression ")"        -> or_
+    ?disjunction: "(" "or" expression expression+ ")"        -> or_
                 | conjunction
 
-    ?conjunction: "(" "and" expression expression ")"       -> and_
+    ?conjunction: "(" "and" expression expression+ ")"       -> and_
                 | negation
 
     ?negation: "(" "not" expression ")"                     -> not_
@@ -53,10 +53,10 @@ class Transformer(Transformer):
         return Not(items[0])
 
     def or_(self, items):
-        return Or(items[0], items[1])
+        return Or(*items)
 
     def and_(self, items):
-        return And(items[0], items[1])
+        return And(*items)
 
     def implies(self, items):
         return Implies(items[0], items[1])
