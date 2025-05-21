@@ -1,8 +1,9 @@
+import sys
 import argparse
 import os
 from trace_parser import parse_trace_file 
 from ast_nodes import Trace, ActionType, Event, BeginEvent, EndEvent
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pprint import pprint
 
 from typing import TypeVar
@@ -26,10 +27,9 @@ def process_readonly(event : Event, store_operations : dict[str, Event], readonl
                             time = event.get_time() + timedelta(milliseconds=1)))
 
 
+# Returns the node that joined or left
 def process_membership(event : Event , current_members: set[str], membership_intervals : list[Event],
-                       membership_operations : dict[str, Event], stable_intervals : list[Event]):
-
-
+                       membership_operations : dict[str, Event], stable_intervals : list[Event]) -> str | None:
 
     assert event.action_type in (ActionType.JOIN, ActionType.LEAVE, ActionType.FAIL), f"Expected JOIN, LEAVE or FAIL, got {event.action_type}"
 
@@ -63,6 +63,7 @@ def process_membership(event : Event , current_members: set[str], membership_int
             membership_intervals.append(BeginEvent(ActionType.MEMBER, [node],
                                 f"Membership{len(membership_intervals) // 2}-{node}",
                                 time = event.get_time() + timedelta(milliseconds=1)))
+            return node
 
         else:
             assert event.action_type in (ActionType.LEAVE, ActionType.FAIL), f"Expected LEAVE or FAIL, got {event.action_type}"
@@ -74,11 +75,75 @@ def process_membership(event : Event , current_members: set[str], membership_int
             membership_intervals.append(EndEvent(ActionType.MEMBER, [],
                                 f"Membership{len(membership_intervals) // 2}-{node}",
                                 time = event.get_time() + timedelta(milliseconds=1)))
+            return node
 
-def process(trace : Trace) -> tuple[list[Event], list[Event], list[Event]]:
+    return None
+
+
+# Circular Order
+def between(a: str, b: str, c: str) -> bool:
+    if a == c:
+        return True
+
+    if a < c:
+        return a < b and b <= c
+    else:
+        return a < b or b <= c
+
+def is_ideal(pointers: dict[str, str], ordered_members: list[str]) -> bool:
+
+    for (i, node) in enumerate(ordered_members):
+
+        # Node joined but no pointer information yet
+        if not node in pointers:
+            pointers[node] = node
+        
+        # Node has correct successor
+        correct_successor = pointers[node] == ordered_members[(i + 1) % len(ordered_members)]
+
+        if (not correct_successor):
+            return False
+
+    return True
+
+def update_ideal_intervals(time : datetime, successor_pointers: dict[str, str],
+                           current_members: set[str], ideal_intervals : list[Event]):
+
+    ordered_members = sorted(current_members)
+
+
+    currently_ideal = is_ideal(successor_pointers, ordered_members)
+
+    if currently_ideal and (len(ideal_intervals) == 0 or type(ideal_intervals[-1]) is EndEvent):
+        ideal_intervals.append(BeginEvent(ActionType.IDEAL, [],
+                                f"Ideal{len(ideal_intervals) // 2}",
+                                time = time))
+
+    elif not currently_ideal and len(ideal_intervals) > 0 and type(ideal_intervals[-1]) is BeginEvent:
+        ideal_intervals.append(EndEvent(ActionType.IDEAL, [],
+                                f"Ideal{len(ideal_intervals) // 2}",
+                                time = time))
+
+def update_responsibility_intervals( successor_pointers: dict[str, str],
+                       current_members: set[str],
+                       current_responsibilities : dict[str, list[Event]], responsability_intervals : list[Event]):
+    pass
+
+def process_successors(successor_change: tuple[datetime, str, str], successor_pointers: dict[str, str],
+                       current_members: set[str], ideal_intervals : list[Event],
+                       current_responsibilities : dict[str, list[Event]], responsability_intervals : list[Event]):
+
+    time, node, successor = successor_change
+    successor_pointers[node] = successor
+
+    update_ideal_intervals(time, successor_pointers, current_members, ideal_intervals)
+
+
+
+def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]]) -> tuple[list[Event], list[Event], list[Event], list[Event]]:
     
     if len(trace.events) == 0:
-        return [], [], []
+        return [], [], [], []
 
     stores = {}
     readonly_intervals = []
@@ -89,6 +154,10 @@ def process(trace : Trace) -> tuple[list[Event], list[Event], list[Event]]:
     membership_operations = {}
     stable_intervals = []
 
+    successor_pointers = {}
+    ideal_intervals = []
+    current_responsibilities = {}
+    responsibility_intervals = []
 
     first_event = trace.events[0][0]
     initial_timestamp = first_event.get_time() - timedelta(milliseconds=1)
@@ -110,18 +179,37 @@ def process(trace : Trace) -> tuple[list[Event], list[Event], list[Event]]:
                         time = initial_timestamp))
 
     event_counter = 0
+    successor_changes_idx = 0
     for instant in trace.events:
+
+        while successor_changes_idx < len(successor_changes) and \
+            instant[0].get_time() > successor_changes[successor_changes_idx][0]:
+
+            process_successors(successor_changes[successor_changes_idx], successor_pointers, current_members, ideal_intervals, current_responsibilities, responsibility_intervals)
+            successor_changes_idx += 1
+
         for event in instant:
             event_counter += 1
+
 
             if event.action_type == ActionType.STORE:
                 process_readonly(event, stores, readonly_intervals)
 
             elif event.action_type in (ActionType.JOIN, ActionType.LEAVE, ActionType.FAIL):
-                process_membership(event, current_members, membership_intervals, membership_operations, stable_intervals)
+                membership_change_node = process_membership(event, 
+                                                            current_members, 
+                                                            membership_intervals,
+                                                            membership_operations,
+                                                            stable_intervals)
 
-            #TODO:
-            # process_successors
+                # If a node joined or left, update the ideal and responsibility intervals
+                if membership_change_node is not None:
+                    new_time = event.get_time() + timedelta(milliseconds=1)
+                    update_ideal_intervals(new_time, successor_pointers, current_members, ideal_intervals)
+
+                    # update_responsibility_intervals(successor_pointers, current_members, current_responsibilities, responsibility_intervals)
+
+
 
     print("Members")
     pprint(membership_intervals)
@@ -132,15 +220,41 @@ def process(trace : Trace) -> tuple[list[Event], list[Event], list[Event]]:
     print("\n\nStable")
     pprint(stable_intervals)
 
+
+    print("\n\nIdeal")
+    pprint(ideal_intervals)
+
+    print("\n\nResponsibilities")
+    pprint(responsibility_intervals)
+
     print("Processed events: ", event_counter)
 
-    return membership_intervals, readonly_intervals, stable_intervals
+    return membership_intervals, readonly_intervals, stable_intervals, ideal_intervals
 
 
 
-#TODO: 
-# parse successors file
-# def process_successors
+def parse_successors(file_path: str) -> list[tuple[datetime, str, str]]:
+    successor_changes = []
+
+    try:
+        with open(file_path, "r") as file:
+            for line in file:
+
+                components = line.strip().split(', ')
+
+                assert len(components) == 4, f"Invalid line in successors file: {line.strip()}, expected 4 arguments but got {len(components)}"
+                
+                time, _, member, succ = components
+                date =  datetime.strptime(time, "%Y-%m-%d %H:%M:%S.%f")
+
+                successor_changes.append((date, member, succ))
+
+
+    except Exception as e:
+        print(f"Error parsing trace file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    return successor_changes
 
 def file_path(path: str) -> str:
     if os.path.isfile(path):
@@ -158,38 +272,41 @@ def main():
 
     args = parser.parse_args()
 
-    if args.file:
-        trace = parse_trace_file(args.file, args.num_lines)
+    trace = parse_trace_file(args.file, args.num_lines)
+
+    if args.successors:
+        successor_changes = parse_successors(args.successors)
+    else:
+        successor_changes = []
+
+    membership_intervals, readonly_intervals, stable_intervals, ideal_intervals =  process(trace, successor_changes)
+
+    with open(args.output, "w") as output_file:
+
+        trace_events = flatten(trace.events)
+        complete_events = trace_events + membership_intervals + readonly_intervals + stable_intervals + ideal_intervals
+        complete_events.sort(key=lambda x: x.get_time())
+
+        for event in complete_events:
+            if event.action_type == ActionType.FAIL and isinstance(event, EndEvent):
+                continue
 
 
-        membership_intervals, readonly_intervals, stable_intervals =  process(trace)
+            time = event.get_time().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
-        with open(args.output, "w") as output_file:
+            event_type = event.get_type().value
 
-            trace_events = flatten(trace.events)
-            complete_events = trace_events + membership_intervals + readonly_intervals + stable_intervals
-            complete_events.sort(key=lambda x: x.get_time())
+            if isinstance(event, EndEvent):
+                if event.action_type in (ActionType.STORE, ActionType.LOOKUP, ActionType.STORE, ActionType.LEAVE, ActionType.JOIN):
+                    event_type = "Reply" + event_type 
+                else:
+                    event_type = "End" + event_type 
 
-            for event in complete_events:
-                if event.action_type == ActionType.FAIL and isinstance(event, EndEvent):
-                    continue
+            id = event.get_id()
+            values = ', '.join(event.values)
+            log_entry = f"{time}, {event_type}, {id}, {values}"
 
-
-                time = event.get_time().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
-                event_type = event.get_type().value
-
-                if isinstance(event, EndEvent):
-                    if event.action_type in (ActionType.STORE, ActionType.LOOKUP, ActionType.STORE, ActionType.LEAVE, ActionType.JOIN):
-                        event_type = "Reply" + event_type 
-                    else:
-                        event_type = "End" + event_type 
-
-                id = event.get_id()
-                values = ', '.join(event.values)
-                log_entry = f"{time}, {event_type}, {id}, {values}"
-
-                output_file.write(log_entry + "\n")
+            output_file.write(log_entry + "\n")
 
 
 def flatten(lst: list[list[T]]) -> list[T]:
