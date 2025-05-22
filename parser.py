@@ -94,6 +94,14 @@ class Transformer(Transformer):
             return Equals(items[1], items[2])
         elif items[0] == "in":
             return Or(Starts(items[1], items[2]), During(items[1], items[2]), Finishes(items[1], items[2]))
+        elif items[0] == "intersects":
+            in_predicate_1 =  Or(Starts(items[1], items[2]), During(items[1], items[2]), Finishes(items[1], items[2]))
+            in_predicate_2 =  Or(Starts(items[2], items[1]), During(items[2], items[1]), Finishes(items[2], items[1]))
+            return Or(Equal(items[1],items[2]),
+                      in_predicate_1,
+                      in_predicate_2,
+                      Overlaps(items[1], items[2]),
+                      Overlaps(items[2],items[1]))
         else:
             raise ValueError(f"Unknown relation {items[0]}")
 
