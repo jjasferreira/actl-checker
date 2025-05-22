@@ -130,16 +130,17 @@ def parse_trace_string(log : str) -> Trace:
 
     ongoing_actions : dict[str, IntervalValue] = {}
 
-    line_number = 0
+    line_number = 1
 
     for line in log.splitlines():
-        line_number += 1
 
         try:
             parse_trace_line(line, trace, ongoing_actions)
         except TraceParsingError as e:
             print(e.display(line_number), file=sys.stderr)
             sys.exit(1)
+
+        line_number += 1
 
     return trace
 
@@ -150,12 +151,12 @@ def parse_trace_file(file_path: str, max_lines : int | None) -> Trace:
 
     ongoing_actions : dict[str, IntervalValue] = {}
 
-    line_number = 0
+    line_number = 1
     try:
         with open(file_path, "r") as file:
             for line in file:
                 
-                if max_lines is not None and line_number >= max_lines:
+                if max_lines is not None and line_number > max_lines:
                     break
 
                 line_number += 1
