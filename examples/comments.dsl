@@ -1,0 +1,24 @@
+// single comment
+/* 
+multi 
+line 
+comment */
+
+/* nested 
+// single comment
+inside multi line comment
+ */
+
+(and
+  (not // single comment
+   (a = b)
+  )
+
+  // comment
+  (or (a = b)
+   /*
+      multi line inside expression
+    */
+    (b = c)
+  )
+)

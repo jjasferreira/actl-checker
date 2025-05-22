@@ -42,6 +42,12 @@ grammar = r"""
     %import common.CNAME
     %import common.WS
     %ignore WS
+    COMMENT_LINE: "//" /[^\n]*/
+
+    COMMENT_BLOCK : /\/\*(.+?)\*\//s # Does not allow for nested block comments
+
+    %ignore COMMENT_LINE
+    %ignore COMMENT_BLOCK
 
     CONST: "'" CNAME
 """
