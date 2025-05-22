@@ -28,7 +28,7 @@ grammar = r"""
     ?atom: equal
          | relation
          | "(" expression ")"
-    ?equal: "(" "equal" variable variable ")"
+    ?equal: "(" variable "=" variable ")"
     ?relation: "(" relation_type interval interval ")"
 
     ?action_type: CNAME -> action_type
@@ -140,8 +140,8 @@ if __name__ == "__main__":
             (and
                 (before i1 i2)
                 (and
-                    (equal k1 k2)
-                    (equal v1 v2)
+                    (k1 = k2)
+                    (v1 = v2)
                 )
             )
         )
