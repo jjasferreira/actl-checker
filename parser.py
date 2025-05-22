@@ -42,6 +42,7 @@ grammar = r"""
     %import common.CNAME
     %import common.WS
     %ignore WS
+
     CONST: "'" CNAME
 """
 
@@ -85,6 +86,8 @@ class Transformer(Transformer):
             return Finishes(items[1], items[2])
         elif items[0] == "equals":
             return Equals(items[1], items[2])
+        elif items[0] == "in":
+            return Or(Starts(items[1], items[2]), During(items[1], items[2]), Finishes(items[1], items[2]))
         else:
             raise ValueError(f"Unknown relation {items[0]}")
 
