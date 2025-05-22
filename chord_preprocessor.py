@@ -124,40 +124,117 @@ def update_ideal_intervals(time : datetime, successor_pointers: dict[str, str],
                                 f"Ideal{len(ideal_intervals) // 2}",
                                 time = time))
 
-def update_responsibility_intervals( successor_pointers: dict[str, str],
-                       current_members: set[str],
-                       current_responsibilities : dict[str, list[Event]], responsability_intervals : list[Event]):
-    pass
+def update_responsibility_intervals(time : datetime, successor_pointers: dict[str, str],
+                        current_responsibilities : dict[str, set[str]],
+                        responsibility_begin_events: dict[tuple[str, str], Event],
+                        responsibility_intervals : list[Event], 
+                        all_keys : set[str]) -> dict[str, set[str]]:
 
-def process_successors(successor_change: tuple[datetime, str, str], successor_pointers: dict[str, str],
-                       current_members: set[str], ideal_intervals : list[Event],
-                       current_responsibilities : dict[str, list[Event]], responsability_intervals : list[Event]):
+    new_responsibilities = {}
 
-    time, node, successor = successor_change
-    successor_pointers[node] = successor
+    # Obtain responsibilities of each node
+    for (node, succ) in successor_pointers.items():
+
+        if succ == node:
+            new_responsibilities[node] = all_keys
+            continue
+
+        new_keys = new_responsibilities.setdefault(succ, set())
+
+        for key in all_keys:
+            if between(node, key, succ):
+                new_keys.add(key)
+
+
+
+    # Check if the responsibilities have changed and update the intervals
+    for (node, succ) in successor_pointers.items():
+
+        prev_keys = current_responsibilities.get(succ, set())
+        new_keys = new_responsibilities.get(succ) 
+
+        assert new_keys is not None, f"succ {succ} not found in new responsibilities: {new_responsibilities}"
+
+        # Terminate responsibility intervals for removed keys
+        for key in prev_keys - new_keys:
+            begin_event = responsibility_begin_events.pop((succ, key), None)
+
+            assert begin_event is not None, f"BeginEvent of Responsibility of node: {succ} and key: {key} not found in ongoing responsibilities: {responsibility_begin_events}"
+
+
+            responsibility_intervals.append(EndEvent(ActionType.RESPONSIBLE, [],
+                                    begin_event.get_id(),
+                                    time = time))
+
+
+    # Create responsibility intervals for new keys
+    # NOTE: Separate loop to order the end events before the begin events
+    for (node, succ) in successor_pointers.items():
+
+        prev_keys = current_responsibilities.get(succ, set())
+        new_keys = new_responsibilities.get(succ) 
+
+        assert new_keys is not None, f"succ {succ} not found in new responsibilities: {new_responsibilities}"
+
+        # Create responsibility intervals for new keys
+        for key in new_keys - prev_keys:
+            begin_event = BeginEvent(ActionType.RESPONSIBLE, [succ, key],
+                                    f"Responsible-{len(responsibility_intervals)}-{succ}-{key}",
+                                    time = time)
+
+            responsibility_intervals.append(begin_event)
+            responsibility_begin_events[(succ, key)] = begin_event
+
+
+    return new_responsibilities
+
+
+def process_successors(time : datetime,
+                       successor_pointers: dict[str, str],
+                       current_members: set[str], 
+                       ideal_intervals : list[Event],
+                       current_responsibilities : dict[str, set[str]],
+                       responsibility_begin_events: dict[tuple[str, str], Event],
+                       responsibility_intervals : list[Event], 
+                       all_keys : set[str]) -> dict[str, set[str]]:
 
     update_ideal_intervals(time, successor_pointers, current_members, ideal_intervals)
 
+    new_responsibilities =  update_responsibility_intervals(time, successor_pointers,
+                        current_responsibilities,
+                        responsibility_begin_events,
+                        responsibility_intervals,
+                        all_keys)
+
+    return new_responsibilities
 
 
-def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]]) -> tuple[list[Event], list[Event], list[Event], list[Event]]:
+def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], keys : set[str]) \
+    -> tuple[list[Event], list[Event], list[Event], list[Event], list[Event]]:
     
     if len(trace.events) == 0:
-        return [], [], [], []
+        return [], [], [], [], []
 
+    # Readonly regimen information
     stores = {}
     readonly_intervals = []
 
+    # Membership information
     current_members = set()
     membership_intervals = []
 
     membership_operations = {}
     stable_intervals = []
 
+    # Ideal state information
     successor_pointers = {}
     ideal_intervals = []
-    current_responsibilities = {}
-    responsibility_intervals = []
+
+    # Responsibility information
+    current_responsibilities : dict[str, set[str]] = {}
+    responsibility_begin_events: dict[tuple[str, str], Event] = {}
+    responsibility_intervals : list[Event] = []
+
 
     first_event = trace.events[0][0]
     initial_timestamp = first_event.get_time() - timedelta(milliseconds=1)
@@ -178,6 +255,16 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]]) 
     stable_intervals.append(BeginEvent(ActionType.STABLE, [], f"Stable{len(stable_intervals) // 2}",
                         time = initial_timestamp))
 
+    # Initial check for ideal state and responsibility
+    current_responsibilities = process_successors(initial_timestamp,
+                                                  successor_pointers,
+                                                  current_members,
+                                                  ideal_intervals,
+                                                  current_responsibilities,
+                                                  responsibility_begin_events,
+                                                  responsibility_intervals,
+                                                  keys) 
+
     event_counter = 0
     successor_changes_idx = 0
     for instant in trace.events:
@@ -185,7 +272,18 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]]) 
         while successor_changes_idx < len(successor_changes) and \
             instant[0].get_time() > successor_changes[successor_changes_idx][0]:
 
-            process_successors(successor_changes[successor_changes_idx], successor_pointers, current_members, ideal_intervals, current_responsibilities, responsibility_intervals)
+            time, node, successor = successor_changes[successor_changes_idx]
+            successor_pointers[node] = successor
+
+            current_responsibilities = process_successors(time,
+                                                          successor_pointers,
+                                                          current_members,
+                                                          ideal_intervals,
+                                                          current_responsibilities,
+                                                          responsibility_begin_events,
+                                                          responsibility_intervals,
+                                                          keys) 
+            
             successor_changes_idx += 1
 
         for event in instant:
@@ -205,31 +303,43 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]]) 
                 # If a node joined or left, update the ideal and responsibility intervals
                 if membership_change_node is not None:
                     new_time = event.get_time() + timedelta(milliseconds=1)
-                    update_ideal_intervals(new_time, successor_pointers, current_members, ideal_intervals)
+                    current_responsibilities = process_successors(new_time,
+                                                          successor_pointers,
+                                                          current_members,
+                                                          ideal_intervals,
+                                                          current_responsibilities,
+                                                          responsibility_begin_events,
+                                                          responsibility_intervals,
+                                                          keys) 
 
-                    # update_responsibility_intervals(successor_pointers, current_members, current_responsibilities, responsibility_intervals)
+    # print("Members")
+    # pprint(membership_intervals)
+    #
+    # print("\n\nReadonly")
+    # pprint(readonly_intervals)
+    #
+    # print("\n\nStable")
+    # pprint(stable_intervals)
+    #
+    #
+    # print("\n\nIdeal")
+    # pprint(ideal_intervals)
+    #
+    # print("\n\nResponsibilities")
+    # pprint(responsibility_intervals)
 
 
-
-    print("Members")
-    pprint(membership_intervals)
-
-    print("\n\nReadonly")
-    pprint(readonly_intervals)
-
-    print("\n\nStable")
-    pprint(stable_intervals)
-
-
-    print("\n\nIdeal")
-    pprint(ideal_intervals)
-
-    print("\n\nResponsibilities")
-    pprint(responsibility_intervals)
+    print("Members", len(membership_intervals))
+    print("Readonly", len(readonly_intervals))
+    print("Stable", len(stable_intervals))
+    print("Ideal", len(ideal_intervals))
+    print("Responsibilities", len(responsibility_intervals))
 
     print("Processed events: ", event_counter)
+    print("Key count: ", len(keys))
 
-    return membership_intervals, readonly_intervals, stable_intervals, ideal_intervals
+    
+    return membership_intervals, readonly_intervals, stable_intervals, ideal_intervals, responsibility_intervals
 
 
 
@@ -256,6 +366,25 @@ def parse_successors(file_path: str) -> list[tuple[datetime, str, str]]:
 
     return successor_changes
 
+def get_keys(trace: Trace) -> set[str]:
+    keys = set()
+
+    for events in trace.events:
+        for event in events:
+            if len(event.values) > 0:
+                keys.add(event.values[0])
+
+            if event.get_type() is ActionType.STORE and type(event) is BeginEvent:
+                keys.add(event.values[1])
+
+            if event.get_type() is ActionType.LOOKUP and type(event) is BeginEvent:
+                keys.add(event.values[1])
+
+            if event.get_type() is ActionType.FINDNODE:
+                keys.add(event.values[1])
+
+    return keys
+
 def file_path(path: str) -> str:
     if os.path.isfile(path):
         return path
@@ -279,12 +408,20 @@ def main():
     else:
         successor_changes = []
 
-    membership_intervals, readonly_intervals, stable_intervals, ideal_intervals =  process(trace, successor_changes)
+    keys = get_keys(trace)
+    membership_intervals, \
+    readonly_intervals, \
+    stable_intervals, \
+    ideal_intervals, \
+    responsibility_intervals =  process(trace, successor_changes, keys)
 
     with open(args.output, "w") as output_file:
 
         trace_events = flatten(trace.events)
-        complete_events = trace_events + membership_intervals + readonly_intervals + stable_intervals + ideal_intervals
+        complete_events = trace_events + membership_intervals \
+                            + readonly_intervals + stable_intervals \
+                            + ideal_intervals + responsibility_intervals
+
         complete_events.sort(key=lambda x: x.get_time())
 
         for event in complete_events:
