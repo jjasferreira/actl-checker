@@ -34,14 +34,14 @@ grammar = r"""
     ?action_type: NAME -> action_type
     ?relation_type: NAME
     ?interval: NAME -> interval
-    ?variable: CONST -> const
+    ?variable: const
              | NAME -> variable
+    const: "'" NAME
 
     ?any_variables: "(" variable* ")"
     ?some_variables: "(" variable+ ")"
 
     NAME: (DIGIT | LETTER | "_")+
-    CONST: "'" NAME
     %import common.LETTER
     %import common.DIGIT
     %import common.WS
@@ -128,8 +128,8 @@ class ASTTransformer(Transformer):
     def variable(self, items):
         return Var(items[0])
 
-    def const(self, items : list[str]):
-        return Constant(items[0].strip("\'"))
+    def const(self, items):
+        return Constant(items[0].value)
 
     def any_variables(self, items):
         return items
