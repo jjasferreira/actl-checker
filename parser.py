@@ -42,9 +42,12 @@ grammar = r"""
     %import common.CNAME
     %import common.WS
     %ignore WS
-    COMMENT_LINE: "//" /[^\n]*/
 
-    COMMENT_BLOCK : /\/\*(.+?)\*\//s # Does not allow for nested block comments
+    %import common.CPP_COMMENT -> COMMENT_LINE
+    # Defined as: /\/\/[^\n]*/
+
+    %import common.C_COMMENT -> COMMENT_BLOCK # Does not allow for nested block comments
+    # Defined as: "/*" /(.|\n)*?/ "*/"
 
     %ignore COMMENT_LINE
     %ignore COMMENT_BLOCK
