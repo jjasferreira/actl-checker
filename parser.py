@@ -115,7 +115,7 @@ class ASTTransformer(Transformer):
 
     def action_type(self, items):
         if ActionType.has_value(items[0]):
-            return ActionType(items[0])
+            return ActionType(items[0].value)
         else:
             raise ValueError(f"Unknown action type {items[0].capitalize()}")
     
@@ -123,10 +123,10 @@ class ASTTransformer(Transformer):
         pass
 
     def interval(self, items):
-        return Interval(items[0])
+        return Interval(items[0].value)
 
     def variable(self, items):
-        return Var(items[0])
+        return Var(items[0].value)
 
     def const(self, items):
         return Constant(items[0].value)
