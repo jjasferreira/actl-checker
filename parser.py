@@ -31,15 +31,19 @@ grammar = r"""
     ?equal: "(" variable "=" variable ")"
     ?relation: "(" relation_type interval interval ")"
 
-    ?action_type: CNAME -> action_type
-    ?relation_type: CNAME
-    ?interval: CNAME -> interval
-    ?variable: CNAME -> variable
-            | CONST -> const
+    ?action_type: NAME -> action_type
+    ?relation_type: NAME
+    ?interval: NAME -> interval
+    ?variable: CONST -> const
+             | NAME -> variable
+
     ?any_variables: "(" variable* ")"
     ?some_variables: "(" variable+ ")"
 
-    %import common.CNAME
+    NAME: (DIGIT | LETTER | "_")+
+    CONST: "'" NAME
+    %import common.LETTER
+    %import common.DIGIT
     %import common.WS
     %ignore WS
 
@@ -52,7 +56,6 @@ grammar = r"""
     %ignore COMMENT_LINE
     %ignore COMMENT_BLOCK
 
-    CONST: "'" CNAME
 """
 
 parser = Lark(grammar, start="start")
