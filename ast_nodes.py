@@ -518,10 +518,14 @@ class ActionQuantifier(Formula, ABC):
 
                 new_var_store = var_store.copy()
                 for (var, value) in zip(action.input, inputs):
+                    if isinstance(var, Wildcard):
+                        continue
                     assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
                     new_var_store[var.label] = value
 
                 for (var, value) in zip(action.output, outputs):
+                    if isinstance(var, Wildcard):
+                        continue
                     assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
                     new_var_store[var.label] = value
 
@@ -736,3 +740,13 @@ class Constant(Formula):
 
     def __repr__(self):
         return f"Constant({self.label})"
+
+class Wildcard(Var):
+    def __init__(self):
+        super().__init__("-")
+
+    def evaluate(self, _trace : Trace, _store, _interval_store) -> Any:
+        raise ValueError("Wildcard should not be evaluated directly")
+
+    def __repr__(self):
+        return f"Wildcard"

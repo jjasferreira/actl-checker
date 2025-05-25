@@ -36,12 +36,16 @@ grammar = r"""
     ?interval: NAME -> interval
     ?variable: const
              | NAME -> variable
+             | WILDCARD -> wildcard
+    
     const: "'" NAME
 
     ?any_variables: "(" variable* ")"
     ?some_variables: "(" variable+ ")"
 
     NAME: (DIGIT | LETTER | "_")+
+    WILDCARD: "-"
+
     %import common.LETTER
     %import common.DIGIT
     %import common.WS
@@ -130,6 +134,9 @@ class ASTTransformer(Transformer):
 
     def const(self, items):
         return Constant(items[0].value)
+
+    def wildcard(self, items):
+        return Wildcard()
 
     def any_variables(self, items):
         return items
