@@ -60,7 +60,7 @@ grammar = r"""
 
 parser = Lark(grammar, start="start")
 
-class Transformer(Transformer):
+class ASTTransformer(Transformer):
     
     def not_(self, items):
         return Not(items[0])
@@ -149,7 +149,7 @@ def parse_ast(input : str) -> Formula:
     if DEBUG:
         print_tree(tree)
         print("-"*30)
-    ast = Transformer().transform(tree)
+    ast = ASTTransformer().transform(tree)
     if DEBUG:
         print(ast) #TODO: print_ast(ast)
         print("-"*30)
