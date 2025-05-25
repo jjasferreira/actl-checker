@@ -83,33 +83,35 @@ class ASTTransformer(Transformer):
     def equal(self, items):
         return Equal(items[0], items[1])
     
+
+    RELATION_MAP = {
+        "before": Before,
+        "meets": Meets,
+        "overlaps": Overlaps,
+        "starts": Starts,
+        "during": During,
+        "finishes": Finishes,
+        "equals": Equals,
+    }
+
     def relation(self, items):
-        if items[0] == "before":
-            return Before(items[1], items[2])
-        elif items[0] == "meets":
-            return Meets(items[1], items[2])
-        elif items[0] == "overlaps":
-            return Overlaps(items[1], items[2])
-        elif items[0] == "starts":
-            return Starts(items[1], items[2])
-        elif items[0] == "during":
-            return During(items[1], items[2])
-        elif items[0] == "finishes":
-            return Finishes(items[1], items[2])
-        elif items[0] == "equals":
-            return Equals(items[1], items[2])
-        elif items[0] == "in":
-            return Or(Starts(items[1], items[2]), During(items[1], items[2]), Finishes(items[1], items[2]))
-        elif items[0] == "intersects":
-            in_predicate_1 =  Or(Starts(items[1], items[2]), During(items[1], items[2]), Finishes(items[1], items[2]))
-            in_predicate_2 =  Or(Starts(items[2], items[1]), During(items[2], items[1]), Finishes(items[2], items[1]))
-            return Or(Equal(items[1],items[2]),
-                      in_predicate_1,
-                      in_predicate_2,
-                      Overlaps(items[1], items[2]),
-                      Overlaps(items[2],items[1]))
+        rel_type = items[0]
+        a, b = items[1], items[2]
+        
+        if rel_type in self.RELATION_MAP:
+            return self.RELATION_MAP[rel_type](a, b)
+        elif rel_type == "in":
+            return Or(Starts(a, b), During(a, b), Finishes(a, b))
+        elif rel_type == "intersects":
+            return Or(
+                Equals(a, b),
+                Or(Starts(a, b), During(a, b), Finishes(a, b)),
+                Or(Starts(b, a), During(b, a), Finishes(b, a)),
+                Overlaps(a, b),
+                Overlaps(b, a),
+            )
         else:
-            raise ValueError(f"Unknown relation {items[0]}")
+            raise ValueError(f"Unknown relation {rel_type}")
 
     def action_type(self, items):
         if ActionType.has_value(items[0]):
