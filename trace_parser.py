@@ -79,13 +79,6 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     return
 
 
-                # HACK:temporary 
-                # Ignore until log preprocessing adds regimens and states
-                if action_type in (ActionType.IDEAL, ActionType.STABLE, ActionType.READONLY, 
-                                  ActionType.MEMBER, ActionType.RESPONSIBLE):
-                    return
-
-
                 if not (event_type.startswith("Reply") or "End" in event_type):
                     event = BeginEvent(action_type, values, event_id, date)
                     
