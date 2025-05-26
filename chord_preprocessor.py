@@ -28,7 +28,7 @@ def process_readonly(event : Event, store_operations : dict[str, Event], readonl
 
 
 # Returns the node that joined or left
-def process_membership(event : Event , current_members: set[str], membership_intervals : list[Event],
+def process_membership(event : Event , current_members: dict[str, BeginEvent], membership_intervals : list[Event],
                        membership_operations : dict[str, Event], stable_intervals : list[Event]) -> str | None:
 
     assert event.action_type in (ActionType.JOIN, ActionType.LEAVE, ActionType.FAIL), f"Expected JOIN, LEAVE or FAIL, got {event.action_type}"
@@ -58,11 +58,15 @@ def process_membership(event : Event , current_members: set[str], membership_int
 
             assert node not in current_members, f"Node \"{event.values[0]}\" cannot join because it is already member: {event}, {current_members: }"
 
-            current_members.add(node)
 
-            membership_intervals.append(BeginEvent(ActionType.MEMBER, [node],
-                                f"Membership{len(membership_intervals) // 2}-{node}",
-                                time = event.get_time() + timedelta(milliseconds=1)))
+            begin_event = BeginEvent(ActionType.MEMBER, [node],
+                       f"Membership{len(membership_intervals) // 2}-{node}",
+                       time = event.get_time() + timedelta(milliseconds=1))
+
+            membership_intervals.append(begin_event)
+
+            current_members[node] = begin_event
+
             return node
 
         else:
@@ -70,10 +74,10 @@ def process_membership(event : Event , current_members: set[str], membership_int
 
             assert node in current_members, f"Node \"{event.values[0]}\" cannot leave because it is not a member: {event}, {current_members: }"
 
-            current_members.remove(node)
+            begin_interval = current_members.pop(node)
 
             membership_intervals.append(EndEvent(ActionType.MEMBER, [],
-                                f"Membership{len(membership_intervals) // 2}-{node}",
+                                begin_interval.get_id(),
                                 time = event.get_time() + timedelta(milliseconds=1)))
             return node
 
@@ -107,10 +111,9 @@ def is_ideal(pointers: dict[str, str], ordered_members: list[str]) -> bool:
     return True
 
 def update_ideal_intervals(time : datetime, successor_pointers: dict[str, str],
-                           current_members: set[str], ideal_intervals : list[Event]):
+                       current_members: dict[str, BeginEvent], ideal_intervals : list[Event]):
 
     ordered_members = sorted(current_members)
-
 
     currently_ideal = is_ideal(successor_pointers, ordered_members)
 
@@ -191,7 +194,7 @@ def update_responsibility_intervals(time : datetime, successor_pointers: dict[st
 
 def process_successors(time : datetime,
                        successor_pointers: dict[str, str],
-                       current_members: set[str], 
+                       current_members: dict[str, BeginEvent], 
                        ideal_intervals : list[Event],
                        current_responsibilities : dict[str, set[str]],
                        responsibility_begin_events: dict[tuple[str, str], Event],
@@ -220,7 +223,7 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
     readonly_intervals = []
 
     # Membership information
-    current_members = set()
+    current_members : dict[str, BeginEvent] = {}
     membership_intervals = []
 
     membership_operations = {}
@@ -241,11 +244,13 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
 
     # Initial member
     initial_member = first_event.values[0]
-    current_members.add(initial_member)
-    membership_intervals.append(BeginEvent(ActionType.MEMBER, [initial_member],
-                        f"Membership{len(membership_intervals) // 2}-{initial_member}",
-                        time = initial_timestamp))
 
+    begin_event = BeginEvent(ActionType.MEMBER, [initial_member],
+                        f"Membership{len(membership_intervals) // 2}-{initial_member}",
+                        time = initial_timestamp)
+
+    membership_intervals.append(begin_event)
+    current_members[initial_member] = begin_event
 
     # Initially in a readonly  regimen
     readonly_intervals.append(BeginEvent(ActionType.READONLY, [], f"ReadOnly{len(readonly_intervals) // 2}",
@@ -401,7 +406,7 @@ def main():
 
     args = parser.parse_args()
 
-    trace = parse_trace_file(args.file, args.num_lines)
+    trace = parse_trace_file(args.file, args.num_lines, True)
 
     if args.successors:
         successor_changes = parse_successors(args.successors)

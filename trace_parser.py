@@ -39,7 +39,7 @@ class DuplicateEndEventError(TraceParsingError):
         return f"End event '{self.event_id}' matches action that already terminated: '{self.interval_value}'\n> {self.line.strip()}"
 
 
-def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, IntervalValue]) -> None:
+def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, IntervalValue], ignore_non_operations : bool) -> None:
                 line = line.strip()
 
                 if not line or line.startswith("#"):
@@ -78,6 +78,11 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     print(f"Unknown event type: {event_type}", file=sys.stderr)
                     return
 
+
+                # NOTE: Ignore non operations in log 
+                if ignore_non_operations and action_type in (ActionType.IDEAL, ActionType.STABLE, ActionType.READONLY, 
+                                  ActionType.MEMBER, ActionType.RESPONSIBLE):
+                    return
 
                 if not (event_type.startswith("Reply") or "End" in event_type):
                     event = BeginEvent(action_type, values, event_id, date)
@@ -124,7 +129,7 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                         raise DuplicateEndEventError(line, event_id, interval_value)
 
 
-def parse_trace_string(log : str) -> Trace:
+def parse_trace_string(log : str, ignore_non_operations : bool = False) -> Trace:
 
     trace = Trace()
 
@@ -135,7 +140,7 @@ def parse_trace_string(log : str) -> Trace:
     for line in log.splitlines():
 
         try:
-            parse_trace_line(line, trace, ongoing_actions)
+            parse_trace_line(line, trace, ongoing_actions, ignore_non_operations)
         except TraceParsingError as e:
             print(e.display(line_number), file=sys.stderr)
             sys.exit(1)
@@ -145,7 +150,7 @@ def parse_trace_string(log : str) -> Trace:
     return trace
 
 
-def parse_trace_file(file_path: str, max_lines : int | None) -> Trace:
+def parse_trace_file(file_path: str, max_lines : int | None, ignore_non_operations : bool = False) -> Trace:
 
     trace = Trace()
 
@@ -160,7 +165,7 @@ def parse_trace_file(file_path: str, max_lines : int | None) -> Trace:
                     break
 
                 try:
-                    parse_trace_line(line, trace, ongoing_actions)
+                    parse_trace_line(line, trace, ongoing_actions, ignore_non_operations)
                 except TraceParsingError as e:
                     print(e.display(line_number), file=sys.stderr)
                     sys.exit(1)
@@ -186,10 +191,12 @@ def main():
     parser.add_argument("-n", "--num-lines", type=int, default=None, 
                         help="Maximum number of lines to process (default: all)")
 
+    parser.add_argument("--ignore", dest="ignore_non_operations", type=bool, default=False, 
+                        help="Maximum number of lines to process (default: all)")
 
     args = parser.parse_args()
 
-    trace = parse_trace_file(args.file, args.num_lines)
+    trace = parse_trace_file(args.file, args.num_lines, args.ignore_non_operations)
 
     print("Trace:", trace)
 
