@@ -413,6 +413,9 @@ def main():
     else:
         successor_changes = []
 
+    trace_events = flatten(trace.events)
+    print(f"Preprocessing {len(trace_events)} events")
+
     keys = get_keys(trace)
     membership_intervals, \
     readonly_intervals, \
@@ -420,20 +423,26 @@ def main():
     ideal_intervals, \
     responsibility_intervals =  process(trace, successor_changes, keys)
 
+
+    #NOTE: filter fail end events to avoid counting them twice
+    filtered_events = list(filter(
+        lambda event: not (event.action_type == ActionType.FAIL and isinstance(event, EndEvent)),
+        trace_events)
+    )
+    
+
+    complete_events = filtered_events + membership_intervals \
+                        + readonly_intervals + stable_intervals \
+                        + ideal_intervals + responsibility_intervals
+
+    complete_events.sort(key=lambda x: x.get_time())
+
+
+    print(f"\nPreprocessing generated {len(complete_events)} events")
+    print(f"Writing {len(complete_events)} events to {args.output}:")
+
     with open(args.output, "w") as output_file:
-
-        trace_events = flatten(trace.events)
-        complete_events = trace_events + membership_intervals \
-                            + readonly_intervals + stable_intervals \
-                            + ideal_intervals + responsibility_intervals
-
-        complete_events.sort(key=lambda x: x.get_time())
-
-        for event in complete_events:
-            if event.action_type == ActionType.FAIL and isinstance(event, EndEvent):
-                continue
-
-
+        for (i, event) in enumerate(complete_events):
             time = event.get_time().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
             event_type = event.get_type().value
@@ -450,6 +459,10 @@ def main():
 
             output_file.write(log_entry + "\n")
 
+            if (i + 1) % (len(complete_events)//10) == 0:
+                print(f"\tWrote {i + 1}/{len(complete_events)} events...")
+
+    print(f"Wrote {len(complete_events)} events to {args.output}")
 
 def flatten(lst: list[list[T]]) -> list[T]:
     return [item for sublist in lst for item in sublist]
