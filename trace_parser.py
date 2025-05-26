@@ -88,7 +88,11 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
 
                 if not (event_type.startswith("Reply") or "End" in event_type):
                     event = BeginEvent(action_type, values, event_id, date)
-                    interval_value = IntervalValue(len(trace))
+                    
+                    #NOTE: temporary value that will be overwritten
+                    temporary_begin_position = 0 
+
+                    interval_value = IntervalValue(temporary_begin_position)
                     ongoing_actions[event_id] = interval_value
 
                     trace.insert_interval(action_type, interval_value)
@@ -96,7 +100,10 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     for (i, value) in enumerate(values):
                         trace.insert_input(action_type, i, value)
 
-                    trace.insert_event(event)
+                    position = trace.insert_event(event)
+
+                    #NOTE: overwrites temporary value with correct positon
+                    interval_value.set_begin(position)
 
 
                 if action_type == ActionType.FAIL or event_type.startswith("Reply") or "End" in event_type:

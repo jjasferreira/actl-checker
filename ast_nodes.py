@@ -230,6 +230,9 @@ class IntervalValue(Formula):
             self.end = end
             return True
 
+    def set_begin(self, begin : int):
+        self.begin = begin
+
     def evaluate(self, _trace, _store, _interval_store):
         return self
 
