@@ -435,31 +435,20 @@ def main():
                         + readonly_intervals + stable_intervals \
                         + ideal_intervals + responsibility_intervals
 
-    complete_events.sort(key=lambda x: x.get_time())
-
+    complete_events.sort(key=lambda x: (x.get_time(), isinstance(x, EndEvent), x.to_log_entry()))
 
     print(f"\nPreprocessing generated {len(complete_events)} events")
     print(f"Writing {len(complete_events)} events to {args.output}:")
 
     with open(args.output, "w") as output_file:
         for (i, event) in enumerate(complete_events):
-            time = event.get_time().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
-            event_type = event.get_type().value
-
-            if isinstance(event, EndEvent):
-                if event.action_type in (ActionType.STORE, ActionType.LOOKUP, ActionType.STORE, ActionType.LEAVE, ActionType.JOIN):
-                    event_type = "Reply" + event_type 
-                else:
-                    event_type = "End" + event_type 
-
-            id = event.get_id()
-            values = ', '.join(event.values)
-            log_entry = f"{time}, {event_type}, {id}, {values}"
+            log_entry = event.to_log_entry()
 
             output_file.write(log_entry + "\n")
-
-            if (i + 1) % (len(complete_events)//10) == 0:
+    
+            step = len(complete_events) // 10
+            if step != 0 and (i + 1) % step  == 0:
                 print(f"\tWrote {i + 1}/{len(complete_events)} events...")
 
     print(f"Wrote {len(complete_events)} events to {args.output}")

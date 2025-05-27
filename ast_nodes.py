@@ -63,7 +63,18 @@ class Event(ABC):
             return False
         else:
             return self.action_type == other.action_type and self.values == other.values
+    
+    def to_log_entry(self) -> str:
+        time_str = self.get_time().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        action_type = self.log_event_type()
 
+        id_str = self.get_id()
+        values_str = ', '.join(self.values)
+        return f"{time_str}, {action_type}, {id_str}, {values_str}"
+
+    @abstractmethod
+    def log_event_type(self) -> str:
+        pass
 
     def __repr__(self):
         return f"({self.time}, {self.id}, {self.action_type}, {self.values})"
@@ -72,12 +83,24 @@ class BeginEvent(Event):
     def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
         super().__init__(action_type, values, id, time)
 
+    def get_log_type(self) -> str:
+        return self.get_type().value
+
+    def log_event_type(self) -> str:
+        return self.get_type().value
+
     def __repr__(self):
         return f"BeginEvent{super().__repr__()}"
 
 class EndEvent(Event):
     def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
         super().__init__(action_type, values, id, time)
+
+    def log_event_type(self) -> str:
+        if self.action_type in (ActionType.STORE, ActionType.LOOKUP, ActionType.LEAVE, ActionType.JOIN):
+            return "Reply" + self.get_type().value
+        else:
+            return "End" + self.get_type().value
 
     def __repr__(self):
         return f"EndEvent{super().__repr__()}"
