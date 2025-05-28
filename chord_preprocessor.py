@@ -334,6 +334,7 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
     # pprint(responsibility_intervals)
 
 
+    print()
     print("Members", len(membership_intervals))
     print("Readonly", len(readonly_intervals))
     print("Stable", len(stable_intervals))
@@ -393,18 +394,61 @@ def get_keys(trace: Trace) -> set[str]:
 def file_path(path: str) -> str:
     if os.path.isfile(path):
         return path
-    raise argparse.ArgumentTypeError(f"file_path: '{path}' is not a valid file")
+    raise argparse.ArgumentTypeError(f"Aborting: '{path}' is not a valid file")
 
+
+def dir_path(path: str) -> str:
+    if os.path.isdir(path):
+        return path
+    raise argparse.ArgumentTypeError(f"Aborting: '{path}' is not a valid directory")
+
+def find_log_file(directory):
+    """Finds the first .log file that does NOT end with 'successor.log'"""
+    for file in os.listdir(directory):
+        if file.endswith(".log") and not file.endswith("successor.log"):
+            return os.path.join(directory, file)
+    raise FileNotFoundError("No log file found (expected a .log file not ending in 'successor.log')")
+
+def find_successor_file(directory):
+    """Finds the first file that ends with 'successor.log'"""
+    for file in os.listdir(directory):
+        if file.endswith("successor.log"):
+            return os.path.join(directory, file)
+    raise FileNotFoundError("No successor file found (expected a file ending in 'successor.log')")
 
 def main():
     parser = argparse.ArgumentParser(description="Preprocess a chord log file.")
-    parser.add_argument("-f", "--file", type=file_path, required=True, help="Path to the chord log file")
+    parser.add_argument("-f", "--file", type=file_path, help="Path to the chord log file")
     parser.add_argument("-s", "--successors", type=file_path, help="Path to the chord successors file")
+    parser.add_argument("-d", "--directory", type=dir_path, help="Path to the directory with log and successors file")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to destination output")
     parser.add_argument("-n", "--num-lines", type=int, default=None, 
                         help="Maximum number of lines to process (default: all)")
 
     args = parser.parse_args()
+
+
+    if args.directory:
+        if args.file:
+            print("Warning: \"--file\" overrides log file from \"--directory\"")
+        else:
+            args.file = find_log_file(args.directory)
+        if args.successors:
+            print("Warning: \"--successors\" overrides successor file from \"--directory\"")
+        else:
+            args.successors = find_successor_file(args.directory)
+
+
+    if not args.file:
+        parser.error("The path to the chord log file \"--file\" must be specified if \"--directory\" is not used.")
+
+
+    print(f"\nUsing log file: {args.file}")
+
+    if args.successors:
+        print(f"Using successors file: {args.successors}\n")
+    else:
+        print(f"Not using a successors file\n")
 
     trace = parse_trace_file(args.file, args.num_lines, True)
 
