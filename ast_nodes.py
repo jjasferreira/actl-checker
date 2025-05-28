@@ -76,6 +76,14 @@ class Event(ABC):
     def log_event_type(self) -> str:
         pass
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return (self.action_type == other.action_type and 
+            self.values == other.values and 
+            self.id == other.id and 
+            self.time == other.time)
+
     def __repr__(self):
         return f"({self.time}, {self.id}, {self.action_type}, {self.values})"
 
@@ -232,6 +240,8 @@ class Var(Formula):
 
         return store[self.label]
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Var) and self.label == other.label
 
     def __repr__(self):
         return f"Var({self.label})"
@@ -301,6 +311,9 @@ class UnaryExpr(Formula, ABC):
                             interval : "Interval") -> list["Action"]:
         return self.expression.get_possible_actions(trace, store, interval_store, interval)
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, type(self)) and self.expression == other.expression
+
 class Not(UnaryExpr):
     def __init__(self, expr):
         super().__init__(expr)
@@ -333,6 +346,10 @@ class BinaryExpr(Formula, ABC):
         possible_actions.extend(self.right.get_possible_actions(trace, store, interval_store, interval))
         return possible_actions
 
+    def __eq__(self, other: object) -> bool:
+        return (isinstance(other, type(self)) and 
+            self.left == other.left and 
+            self.right == other.right)
 
 class Equal(BinaryExpr):
     def __init__(self, left, right):
@@ -346,6 +363,20 @@ class Equal(BinaryExpr):
 
     def __repr__(self):
         return f"({self.left} == {self.right})"
+
+
+class Implies(BinaryExpr):
+    def __init__(self, left, right):
+        super().__init__(left, right)
+
+    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+        left = self.left.evaluate(trace, store, interval_store) 
+        right = self.right.evaluate(trace, store, interval_store)
+
+        return (not left) or right
+
+    def __repr__(self):
+        return f"({self.left} => {self.right})"
 
 
 class NAryExpr(Formula, ABC):
@@ -373,6 +404,12 @@ class NAryExpr(Formula, ABC):
             possible_actions.extend(expression.get_possible_actions(trace, store, interval_store, interval))
 
         return possible_actions
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return self.expressions == other.expressions
+
 
 class And(NAryExpr):
     def __init__(self, *expressions : Formula):
@@ -406,19 +443,6 @@ class Or(NAryExpr):
 
     def __repr__(self):
         return " v ".join(map(str, self.expressions))
-
-class Implies(BinaryExpr):
-    def __init__(self, left, right):
-        super().__init__(left, right)
-
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
-        left = self.left.evaluate(trace, store, interval_store) 
-        right = self.right.evaluate(trace, store, interval_store)
-
-        return (not left) or right
-
-    def __repr__(self):
-        return f"({self.left} => {self.right})"
 
 
 class Quantifier(Formula, ABC):
@@ -487,6 +511,12 @@ class Quantifier(Formula, ABC):
                 # print(f"Recursive case COMPLETED Evaluating {var_idx = }, {var = }: {self.expr} with {var_store}")
                 return not short_circuit_on
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return self.vars == other.vars and self.expression == other.expression
+
+
 class Exists(Quantifier):
     def __init__(self, vars, expr):
         super().__init__(vars, expr)
@@ -498,6 +528,7 @@ class Exists(Quantifier):
         var_str = ", ".join(map(str, self.vars))
         return f"∃({var_str}). ({self.expression})"
 
+
 class ForAll(Quantifier):
     def __init__(self, vars, expr):
         super().__init__(vars, expr)
@@ -508,7 +539,6 @@ class ForAll(Quantifier):
     def __repr__(self):
         var_str = ", ".join(map(str, self.vars))
         return f"∀({var_str}). ({self.expression})"
-
 
 
 class ActionQuantifier(Formula, ABC):
@@ -566,6 +596,11 @@ class ActionQuantifier(Formula, ABC):
                     return short_circuit_on
             
             return not short_circuit_on
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return self.action == other.action and self.expression == other.expression
 
 
 class ExistsAction(ActionQuantifier):
@@ -661,13 +696,20 @@ class Action(Formula):
         else:
             return []
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Action):
+            return False
+        return (self.action_type == other.action_type and 
+            self.interval == other.interval and 
+            self.input == other.input and 
+            self.output == other.output)
+
     def __repr__(self):
         type_str = self.action_type.name.lower()
         input_str = ", ".join(map(str, self.input))
         output_str = ", ".join(map(str, self.output))
 
         return f"{type_str}[{self.interval}] ({input_str}) -> ({output_str})"
-
 
 
 class IntervalPredicate(Formula, ABC):
@@ -678,6 +720,13 @@ class IntervalPredicate(Formula, ABC):
 
         self.left = left
         self.right = right
+    
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+        return (self.left == other.left and 
+                self.right == other.right)
+
 
 class Before(IntervalPredicate):
     def __init__(self, left : Interval, right : Interval):
@@ -770,8 +819,12 @@ class Constant(Formula):
     def evaluate(self, _trace : Trace, _store, _interval_store) -> Any:
         return self.label
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Constant) and self.label == other.label
+
     def __repr__(self):
         return f"Constant({self.label})"
+
 
 class Wildcard(Var):
     def __init__(self):
@@ -779,6 +832,9 @@ class Wildcard(Var):
 
     def evaluate(self, _trace : Trace, _store, _interval_store) -> Any:
         raise ValueError("Wildcard should not be evaluated directly")
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Wildcard)
 
     def __repr__(self):
         return f"Wildcard"
