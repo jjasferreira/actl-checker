@@ -182,7 +182,7 @@ class Trace:
                     if interval.end != float("inf"):
                         assert isinstance(interval.end, int), f"Interval end boundary should be an index of Trace.events: \"{interval.end}\""
                         for end_event in self.events[interval.end]:
-                            if isinstance(event, BeginEvent) and end_event.id == event.id:
+                            if isinstance(end_event, EndEvent) and end_event.id == event.id:
                                 outputs = end_event.values
                                 break
 
