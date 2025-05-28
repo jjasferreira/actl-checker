@@ -136,6 +136,10 @@ class Trace:
     def __len__(self) -> int:
         return len(self.events)
 
+    # Returns the number of events in the trace
+    def get_length(self) -> int:
+        return sum(len(event_list) for event_list in self.events)
+
     def insert_event(self, event : Event) -> int:
         if len(self.events) == 0 or self.events[-1][0].get_time() < event.get_time():
             self.events.append([event])

@@ -54,18 +54,17 @@ def main():
     
 
     ast = parse_input(input_text)
-    print(ast)
-
 
     if args.trace:
         trace = parse_trace_file(args.trace, args.num_lines)
         var_store = {}
         interval_store = {}
-
-        print("Evaluating formula:")
+        print(f"\nEvaluating formula on trace '{args.trace}' with {trace.get_length()} events:\n")
         print(ast)
         result = ast.evaluate(trace, var_store, interval_store)
-        print(f"Result: {result}")
+        print(f"\nResult: {result}")
+    else:
+        print(f"Formula:\n{ast}")
     
 
 if __name__ == "__main__":
