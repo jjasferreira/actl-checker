@@ -21,8 +21,8 @@ grammar = r"""
     ?negation: "(" "not" expression ")"                     -> not_
              | quantifier
 
-    ?quantifier: "(" "forall" action_type interval any_variables any_variables expression ")" -> forall
-               | "(" "exists" action_type interval any_variables any_variables expression ")" -> exists
+    ?quantifier: "(" "forall" action_type interval any_variables any_variables expression+ ")" -> forall
+               | "(" "exists" action_type interval any_variables any_variables expression+ ")" -> exists
                | atom
 
     ?atom: equal
@@ -78,11 +78,18 @@ class ASTTransformer(Transformer):
     def implies(self, items):
         return Implies(items[0], items[1])
 
+
+    def _quantifier(self, items, quantifier_cls):
+        action = Action(items[0], items[1], items[2], items[3])
+        exprs = items[4:]
+        body = exprs[0] if len(exprs) == 1 else And(*exprs)
+        return quantifier_cls(action, body)
+
     def forall(self, items):
-        return ForAllAction(Action(items[0], items[1], items[2], items[3]), items[4])
+        return self._quantifier(items, ForAllAction)
 
     def exists(self, items):
-        return ExistsAction(Action(items[0], items[1], items[2], items[3]), items[4])
+        return self._quantifier(items, ExistsAction)
 
     def equal(self, items):
         return Equal(items[0], items[1])

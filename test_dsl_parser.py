@@ -241,6 +241,25 @@ class TestDSLParser(unittest.TestCase):
         self.assertEqual(ast, expected)
 
 
+    def test_forall_implicit_conjunction(self):
+        dsl = "(forall lookup i1 (x) (y) (x = y) (x = x))"
+        ast = self.parse_and_transform(dsl)
+        self.assertIsInstance(ast, ForAllAction)
+        self.assertIsInstance(ast.action, Action)
+        self.assertIsInstance(ast.expression, And)
+        self.assertEqual(len(ast.expression.expressions), 2)
+        self.assertTrue(all(isinstance(e, Equal) for e in ast.expression.expressions))
+
+        expected = ForAllAction(
+                Action(ActionType.LOOKUP, Interval("i1"), [Var("x")], [Var("y")]),
+                And(
+                    Equal(Var("x"), Var("y")),
+                    Equal(Var("x"), Var("x"))
+                )
+            )
+        self.assertEqual(ast, expected)
+
+
     def test_exists(self):
         dsl = "(exists lookup i1 (x) (y) (x = y))"
         ast = self.parse_and_transform(dsl)
@@ -251,6 +270,25 @@ class TestDSLParser(unittest.TestCase):
             Action(ActionType.LOOKUP, Interval("i1"), Var("x"), Var("y")),
             Equal(Var("x"), Var("y"))
         )
+        self.assertEqual(ast, expected)
+
+
+    def test_exists_implicit_conjunction(self):
+        dsl = "(exists lookup i1 (x) (y) (x = y) (x = x))"
+        ast = self.parse_and_transform(dsl)
+        self.assertIsInstance(ast, ExistsAction)
+        self.assertIsInstance(ast.action, Action)
+        self.assertIsInstance(ast.expression, And)
+        self.assertEqual(len(ast.expression.expressions), 2)
+        self.assertTrue(all(isinstance(e, Equal) for e in ast.expression.expressions))
+
+        expected = ExistsAction(
+                Action(ActionType.LOOKUP, Interval("i1"), [Var("x")], [Var("y")]),
+                And(
+                    Equal(Var("x"), Var("y")),
+                    Equal(Var("x"), Var("x"))
+                )
+            )
         self.assertEqual(ast, expected)
 
 
