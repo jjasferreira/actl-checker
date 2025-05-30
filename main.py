@@ -63,6 +63,7 @@ def main():
         print(ast)
         result = ast.evaluate(trace, var_store, interval_store)
         print(f"\nResult: {result}")
+        print(f"\nOccurrences: {trace.occurrence_counter}")
     else:
         print(f"Formula:\n{ast}")
     

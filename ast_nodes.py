@@ -132,6 +132,7 @@ class Trace:
         self.intervals = intervals
         self.inputs = inputs
         self.outputs = outputs
+        self.occurrence_counter = 0
 
     def __len__(self) -> int:
         return len(self.events)
@@ -174,6 +175,8 @@ class Trace:
         return self.intervals[action_type]
 
     def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
+
+        self.occurrence_counter += 1
         actions = []
 
         intervals = self.intervals[action_type]
