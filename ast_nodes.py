@@ -5,7 +5,7 @@ from typing import Any, TypeAlias
 from datetime import datetime
 import sys
 
-IntervalCollection : TypeAlias = dict["ActionType", list["IntervalValue"]]
+ActionCollection : TypeAlias = dict["ActionType", list["ActionValue"]]
 VarCollection : TypeAlias = dict[tuple["ActionType", int], list[str]]
 
 
@@ -38,6 +38,49 @@ class ActionType(Enum):
 
         return None
 
+class ActionValue():
+    def __init__(self, action_type: ActionType, id : str, interval: "IntervalValue", inputs : list[str], outputs : list[str]):
+        self.action_type = action_type
+        self.id = id
+        self.interval = interval
+        self.inputs = inputs 
+        self.outputs = outputs 
+
+    def get_type(self) -> ActionType:
+        return self.action_type
+
+    def get_id(self) -> str:
+        return self.id
+
+    def get_interval(self) -> "IntervalValue":
+        return self.interval
+
+    def get_inputs(self) -> list[str]:
+        return self.inputs
+
+    def get_outputs(self) -> list[str]:
+        return self.outputs
+
+
+    def complete_end(self, outputs : list[str], end_position : int) -> bool:
+        if self.outputs != [] or self.interval.end != float("inf"):
+            return False
+        else:
+            self.outputs = outputs
+            self.interval.complete_end(end_position)
+            return True
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ActionValue):
+            return False
+        return (self.action_type == other.action_type and 
+            self.id == other.id and 
+            self.interval == other.interval and 
+            self.inputs == other.inputs and 
+            self.outputs == other.outputs)
+
+    def __repr__(self):
+        return f"ActionValue({self.action_type}, {self.interval}, {self.inputs}, {self.outputs})"
 
 class Event(ABC):
     @abstractmethod
@@ -115,23 +158,26 @@ class EndEvent(Event):
 
 class Trace:
     def __init__(self, events : list[list[Event]] | None = None, 
-                 intervals : IntervalCollection | None = None, 
+                 actions : ActionCollection | None = None, 
                  inputs : VarCollection | None = None,
                  outputs : VarCollection | None = None):
 
         if events is None:
             events = []
-        if intervals is None:
-            intervals = defaultdict(list)
+        if actions is None:
+            actions = defaultdict(list)
         if inputs is None:
             inputs = defaultdict(list)
         if outputs is None:
             outputs = defaultdict(list)
          
         self.events = events
-        self.intervals = intervals
+        self.actions = actions
+
+        #NOTE: used only for variable quantifiers, which are currently not used
         self.inputs = inputs
         self.outputs = outputs
+        self.get_actions_count = 0
 
     def __len__(self) -> int:
         return len(self.events)
@@ -150,10 +196,37 @@ class Trace:
 
         return len(self.events) - 1
 
-    def insert_interval(self, action_type : ActionType, interval_value: "IntervalValue"):
-        # TODO: use defaultdict or setdefault?
-        # self.intervals[action_type].append(interval_value)
-        self.intervals.setdefault(action_type, []).append(interval_value)
+    # def insert_action(self, action_type : ActionType, action_value: ActionValue):
+    def insert_begin_event(self,  action_type : ActionType, 
+                           inputs: list[str], id : str, date : datetime) -> ActionValue:
+
+        event = BeginEvent(action_type, inputs, id, date)
+        
+        begin_position = self.insert_event(event)
+        interval_value = IntervalValue(begin_position)
+
+        for (i, value) in enumerate(inputs):
+            self.insert_input(action_type, i, value)
+
+        action_value = ActionValue(action_type, id, interval_value, inputs, [])
+
+        self.actions.setdefault(action_type, []).append(action_value)
+
+        return action_value
+
+
+    def insert_end_event(self, action : ActionValue, 
+                         outputs: list[str], date : datetime) -> bool:
+
+        event = EndEvent(action.get_type(), outputs, action.get_id(), date)
+        
+        end_position = self.insert_event(event)
+
+        for (i, value) in enumerate(outputs):
+            self.insert_output(action.get_type(), i, value)
+
+        return action.complete_end(outputs, end_position)
+
 
     def insert_input(self, action_type : ActionType, index : int, input_Value: str):
         self.insert_value(self.inputs, action_type, index, input_Value)
@@ -170,29 +243,37 @@ class Trace:
     def get_outputs(self,  action_type : ActionType, index : int) -> list[str]:
         return self.outputs[(action_type, index)]
 
-    def get_intervals(self,  action_type : ActionType) -> list["IntervalValue"]:
-        return self.intervals[action_type]
+    # def get_intervals(self,  action_type : ActionType) -> list["IntervalValue"]:
+    #     return self.intervals[action_type]
 
-    def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
-        actions = []
 
-        intervals = self.intervals[action_type]
+    def get_actions(self,  action_type : ActionType) -> list[ActionValue]:
+        self.get_actions_count += 1
+        return self.actions[action_type]
 
-        for interval in intervals:
-            for event in self.events[interval.begin]:
-                if isinstance(event, BeginEvent) and event.action_type == action_type:
-                    inputs = event.values
-                    outputs = []
-                    if interval.end != float("inf"):
-                        assert isinstance(interval.end, int), f"Interval end boundary should be an index of Trace.events: \"{interval.end}\""
-                        for end_event in self.events[interval.end]:
-                            if isinstance(end_event, EndEvent) and end_event.id == event.id:
-                                outputs = end_event.values
-                                break
-
-                    actions.append((interval, inputs, outputs))
-
-        return actions
+    # def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
+    #     actions = []
+    #
+    #     intervals = self.intervals[action_type]
+    #
+    #     for interval in intervals:
+    #
+    #         for event in self.events[interval.begin]:
+    #             if isinstance(event, BeginEvent) and event.action_type == action_type:
+    #                 inputs = event.values
+    #                 outputs = []
+    #
+    #                 if interval.end != float("inf"):
+    #                     assert isinstance(interval.end, int), f"Interval end boundary should be an index of Trace.events: \"{interval.end}\""
+    #
+    #                     for end_event in self.events[interval.end]:
+    #                         if isinstance(end_event, EndEvent) and end_event.id == event.id:
+    #                             outputs = end_event.values
+    #                             break
+    #
+    #                 actions.append((interval, inputs, outputs))
+    #
+    #     return actions
 
 
     def complete_event(self, event : Event, t : int) -> None | Event: 
@@ -215,9 +296,9 @@ class Trace:
 
         outputs = "\n".join([f"{action_type}: {values}" for action_type, values in self.outputs.items()])
         inputs = "\n".join([f"{action_type}: {values}" for action_type, values in self.inputs.items()])
-        intervals = "\n".join([f"{action_type}: {values}" for action_type, values in self.intervals.items()])
+        intervals = "\n".join([f"{action_type}: {values}" for action_type, values in self.actions.items()])
 
-        return f"Trace(Events: {events};\nInputs: {inputs};\nOutputs: {outputs};\nIntervals: {intervals})"
+        return f"Trace(Events: {events};\n\nInputs: {inputs};\n\nOutputs: {outputs};\n\nIntervals: {intervals})"
 
 class Formula(ABC):
     @abstractmethod
@@ -565,14 +646,18 @@ class ActionQuantifier(Formula, ABC):
                             interval : "Interval") -> list["Action"]:
         return self.expression.get_possible_actions(trace, store, interval_store, interval)
 
+
     def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
                         short_circuit_on : bool):
 
             action = self.action
             possible_actions = trace.get_actions(action.get_type())
 
-            for (interval_value, inputs, outputs) in possible_actions:
-
+            for possible_action in possible_actions:
+                inputs = possible_action.inputs
+                outputs = possible_action.outputs
+                interval_value = possible_action.interval
+                
                 #TODO: Mismatched number of inputs and outputs between formula and trace action
                 if len(inputs) < len(action.input) or len(outputs) < len(action.output):
                     print(f"Warning: Possible action {action} has more inputs or outputs than action in trace: {interval_value, inputs, outputs}", file=sys.stderr)
@@ -600,6 +685,42 @@ class ActionQuantifier(Formula, ABC):
                     return short_circuit_on
             
             return not short_circuit_on
+
+    # def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
+    #                     short_circuit_on : bool):
+    #
+    #         action = self.action
+    #         possible_actions = trace.get_actions(action.get_type())
+    #
+    #         for (interval_value, inputs, outputs) in possible_actions:
+    #
+    #             #TODO: Mismatched number of inputs and outputs between formula and trace action
+    #             if len(inputs) < len(action.input) or len(outputs) < len(action.output):
+    #                 print(f"Warning: Possible action {action} has more inputs or outputs than action in trace: {interval_value, inputs, outputs}", file=sys.stderr)
+    #                 continue
+    #
+    #             new_interval_store = interval_store.copy()
+    #             new_interval_store[action.interval.label] = interval_value
+    #
+    #             new_var_store = var_store.copy()
+    #             for (var, value) in zip(action.input, inputs):
+    #                 if isinstance(var, Wildcard):
+    #                     continue
+    #                 assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
+    #                 new_var_store[var.label] = value
+    #
+    #             for (var, value) in zip(action.output, outputs):
+    #                 if isinstance(var, Wildcard):
+    #                     continue
+    #                 assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
+    #                 new_var_store[var.label] = value
+    #
+    #
+    #             result = self.expression.evaluate(trace, new_var_store, new_interval_store)
+    #             if result == short_circuit_on:
+    #                 return short_circuit_on
+    #
+    #         return not short_circuit_on
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
