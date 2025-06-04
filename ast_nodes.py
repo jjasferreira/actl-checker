@@ -242,7 +242,7 @@ class Trace:
     def get_outputs(self,  action_type : ActionType, index : int) -> list[str]:
         return self.outputs[(action_type, index)]
 
-    def get_actions(self,  action_type : ActionType) -> list[ActionValue]:
+    def findOcurrences(self,  action_type : ActionType) -> list[ActionValue]:
         return self.actions[action_type]
 
     # def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
@@ -645,7 +645,7 @@ class ActionQuantifier(Formula, ABC):
                         short_circuit_on : bool):
 
             action = self.action
-            possible_actions = trace.get_actions(action.get_type())
+            possible_actions = trace.findOcurrences(action.get_type())
 
             for possible_action in possible_actions:
                 inputs = possible_action.inputs
