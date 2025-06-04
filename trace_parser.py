@@ -5,10 +5,8 @@ from datetime import datetime
 
 from ast_nodes import (
     Trace,
-    BeginEvent,
-    EndEvent,
     ActionType,
-    IntervalValue,
+    ActionValue,
 )
 
 EMPTY_VALUE = "no_value"
@@ -31,15 +29,15 @@ class MissingIntervalError(TraceParsingError):
         return f"End event '{self.event_id}' does not match any ongoing action.\n> {self.line.strip()}"
 
 class DuplicateEndEventError(TraceParsingError):
-    def __init__(self, line : str, event_id: str, interval_value: IntervalValue):
+    def __init__(self, line : str, event_id: str, action_value: ActionValue):
         super().__init__(line, event_id)
-        self.interval_value = interval_value
+        self.action_Value = action_value
 
     def __str__(self) -> str:
-        return f"End event '{self.event_id}' matches action that already terminated: '{self.interval_value}'\n> {self.line.strip()}"
+        return f"End event '{self.event_id}' matches action that already terminated: '{self.action_Value}'\n> {self.line.strip()}"
 
 
-def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, IntervalValue], ignore_non_operations : bool) -> None:
+def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, ActionValue], ignore_non_operations : bool) -> None:
                 line = line.strip()
 
                 if not line or line.startswith("#"):
@@ -85,23 +83,28 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     return
 
                 if not (event_type.startswith("Reply") or "End" in event_type):
-                    event = BeginEvent(action_type, values, event_id, date)
                     
-                    #NOTE: temporary value that will be overwritten
-                    temporary_begin_position = 0 
+                    action_value = trace.insert_begin_event(action_type, values, event_id, date)
 
-                    interval_value = IntervalValue(temporary_begin_position)
-                    ongoing_actions[event_id] = interval_value
+                    ongoing_actions[event_id] = action_value
 
-                    trace.insert_interval(action_type, interval_value)
-
-                    for (i, value) in enumerate(values):
-                        trace.insert_input(action_type, i, value)
-
-                    position = trace.insert_event(event)
-
-                    #NOTE: overwrites temporary value with correct positon
-                    interval_value.set_begin(position)
+                    # event = BeginEvent(action_type, values, event_id, date)
+                    
+                    # #NOTE: temporary value that will be overwritten
+                    # temporary_begin_position = 0 
+                    #
+                    # action_value = ActionValue(temporary_begin_position)
+                    # ongoing_actions[event_id] = action_value
+                    #
+                    # # trace.insert_action(action_type, interval_value)
+                    #
+                    # for (i, value) in enumerate(values):
+                    #     trace.insert_input(action_type, i, value)
+                    #
+                    # position = trace.insert_event(event)
+                    #
+                    # #NOTE: overwrites temporary value with correct positon
+                    # action_value.set_begin(position)
 
 
                 if action_type == ActionType.FAIL or event_type.startswith("Reply") or "End" in event_type:
@@ -111,29 +114,42 @@ def parse_trace_line(line : str, trace : Trace, ongoing_actions : dict[str, Inte
                     if action_type == ActionType.LOOKUP and len(values) == 1:
                         values.append(EMPTY_VALUE)
 
-                    event = EndEvent(action_type, values, event_id, date)
 
-                    interval_value = ongoing_actions.pop(event_id, None)
+                    action_value = ongoing_actions.pop(event_id, None)
 
-                    if interval_value is None:
+                    if action_value is None:
                         raise MissingIntervalError(line, event_id)
 
-                    for (i, value) in enumerate(values):
-                        trace.insert_output(action_type, i, value)
+                    assert action_value is not None, f"Action value for event_id '{event_id}' not found in ongoing actions."
 
-                    position = trace.insert_event(event)
-
-                    success =  interval_value.complete_end(position)
+                    success = trace.insert_end_event(action_value, values, date)
 
                     if not success:
-                        raise DuplicateEndEventError(line, event_id, interval_value)
+                        raise DuplicateEndEventError(line, event_id, action_value)
+
+
+                    # event = EndEvent(action_type, values, event_id, date)
+                    #
+                    #
+                    # if action_value is None:
+                    #     raise MissingIntervalError(line, event_id)
+                    #
+                    # for (i, value) in enumerate(values):
+                    #     trace.insert_output(action_type, i, value)
+                    #
+                    # position = trace.insert_event(event)
+                    #
+                    # success =  action_value.complete_end(position)
+                    #
+                    # if not success:
+                    #     raise DuplicateEndEventError(line, event_id, action_value)
 
 
 def parse_trace_string(log : str, ignore_non_operations : bool = False) -> Trace:
 
     trace = Trace()
 
-    ongoing_actions : dict[str, IntervalValue] = {}
+    ongoing_actions : dict[str, ActionValue] = {}
 
     line_number = 1
 
@@ -154,7 +170,7 @@ def parse_trace_file(file_path: str, max_lines : int | None, ignore_non_operatio
 
     trace = Trace()
 
-    ongoing_actions : dict[str, IntervalValue] = {}
+    ongoing_actions : dict[str, ActionValue] = {}
 
     line_number = 1
     try:
