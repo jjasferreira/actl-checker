@@ -174,10 +174,9 @@ class Trace:
         self.events = events
         self.actions = actions
 
-        #NOTE: used only for variable quantifiers, which are currently not used
+        #NOTE: inputs and outputs used only for variable quantifiers, which are currently not used
         self.inputs = inputs
         self.outputs = outputs
-        self.get_actions_count = 0
 
     def __len__(self) -> int:
         return len(self.events)
@@ -243,12 +242,7 @@ class Trace:
     def get_outputs(self,  action_type : ActionType, index : int) -> list[str]:
         return self.outputs[(action_type, index)]
 
-    # def get_intervals(self,  action_type : ActionType) -> list["IntervalValue"]:
-    #     return self.intervals[action_type]
-
-
     def get_actions(self,  action_type : ActionType) -> list[ActionValue]:
-        self.get_actions_count += 1
         return self.actions[action_type]
 
     # def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
