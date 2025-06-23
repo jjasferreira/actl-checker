@@ -199,20 +199,28 @@ def process_successors(time : datetime,
                        current_responsibilities : dict[str, set[str]],
                        responsibility_begin_events: dict[tuple[str, str], Event],
                        responsibility_intervals : list[Event], 
-                       all_keys : set[str]) -> dict[str, set[str]]:
+                       all_keys : set[str],
+                       process_responsibility : bool) -> dict[str, set[str]]:
 
     update_ideal_intervals(time, successor_pointers, current_members, ideal_intervals)
 
-    new_responsibilities =  update_responsibility_intervals(time, successor_pointers,
-                        current_responsibilities,
-                        responsibility_begin_events,
-                        responsibility_intervals,
-                        all_keys)
+    if process_responsibility:
+        new_responsibilities =  update_responsibility_intervals(time, successor_pointers,
+                            current_responsibilities,
+                            responsibility_begin_events,
+                            responsibility_intervals,
+                            all_keys)
+    else:
+        new_responsibilities = current_responsibilities
 
     return new_responsibilities
 
 
-def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], keys : set[str]) \
+def process_intervals(trace : Trace, 
+                      successor_changes : list[tuple[datetime, str, str]],
+                      keys : set[str],
+                      process_responsibility : bool,
+                      verbose : bool = False) \
     -> tuple[list[Event], list[Event], list[Event], list[Event], list[Event]]:
     
     if len(trace.events) == 0:
@@ -268,7 +276,8 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
                                                   current_responsibilities,
                                                   responsibility_begin_events,
                                                   responsibility_intervals,
-                                                  keys) 
+                                                  keys,
+                                                  process_responsibility) 
 
     event_counter = 0
     successor_changes_idx = 0
@@ -287,7 +296,8 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
                                                           current_responsibilities,
                                                           responsibility_begin_events,
                                                           responsibility_intervals,
-                                                          keys) 
+                                                          keys,
+                                                          process_responsibility) 
             
             successor_changes_idx += 1
 
@@ -315,7 +325,8 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
                                                           current_responsibilities,
                                                           responsibility_begin_events,
                                                           responsibility_intervals,
-                                                          keys) 
+                                                          keys,
+                                                          process_responsibility) 
 
     # print("Members")
     # pprint(membership_intervals)
@@ -334,15 +345,16 @@ def process(trace : Trace, successor_changes : list[tuple[datetime, str, str]], 
     # pprint(responsibility_intervals)
 
 
-    print()
-    print("Members", len(membership_intervals))
-    print("Readonly", len(readonly_intervals))
-    print("Stable", len(stable_intervals))
-    print("Ideal", len(ideal_intervals))
-    print("Responsibilities", len(responsibility_intervals))
+    if verbose:
+        print()
+        print("Members", len(membership_intervals))
+        print("Readonly", len(readonly_intervals))
+        print("Stable", len(stable_intervals))
+        print("Ideal", len(ideal_intervals))
+        print("Responsibilities", len(responsibility_intervals))
 
-    print("Processed events: ", event_counter)
-    print("Key count: ", len(keys))
+        print("Processed events: ", event_counter)
+        print("Key count: ", len(keys))
 
     
     return membership_intervals, readonly_intervals, stable_intervals, ideal_intervals, responsibility_intervals
@@ -402,103 +414,156 @@ def dir_path(path: str) -> str:
         return path
     raise argparse.ArgumentTypeError(f"Aborting: '{path}' is not a valid directory")
 
-def find_log_file(directory):
+def find_log_file(directory : str):
     """Finds the first .log file that does NOT end with 'successor.log'"""
     for file in os.listdir(directory):
         if file.endswith(".log") and not file.endswith("successor.log"):
             return os.path.join(directory, file)
     raise FileNotFoundError("No log file found (expected a .log file not ending in 'successor.log')")
 
-def find_successor_file(directory):
+def find_successor_file(directory : str):
     """Finds the first file that ends with 'successor.log'"""
     for file in os.listdir(directory):
         if file.endswith("successor.log"):
             return os.path.join(directory, file)
     raise FileNotFoundError("No successor file found (expected a file ending in 'successor.log')")
 
-def main():
-    parser = argparse.ArgumentParser(description="Preprocess a chord log file.")
+
+
+
+def get_log_files(log_path: str | None, 
+                  successors_path: str | None, 
+                  dir_path: str | None,
+                  verbose: bool = False) -> tuple[str, str | None]:
+
+    if dir_path:
+        if log_path:
+            print("Warning: \"--file\" overrides log file from \"--directory\"")
+        else:
+            log_path = find_log_file(dir_path)
+        if successors_path:
+            print("Warning: \"--successors\" overrides successor file from \"--directory\"")
+        else:
+            successors_path = find_successor_file(dir_path)
+    
+    if not log_path:
+        raise ValueError("The path to the chord log file must be specified if --directory is not used.")
+
+    if verbose:
+        print(f"\nUsing log file: {log_path}")
+        print(f"Using successors file: {successors_path}\n" if successors_path else "Not using a successors file\n")
+    return log_path, successors_path
+
+
+def load_trace_data(log_path : str, successors_path : str | None, num_lines : int | None) \
+        -> tuple[Trace, list[tuple[datetime, str, str]]]:
+
+    trace = parse_trace_file(log_path, num_lines, True)
+    successor_changes = parse_successors(successors_path) if successors_path else []
+    return trace, successor_changes
+
+def flatten(lst: list[list[T]]) -> list[T]:
+    return [item for sublist in lst for item in sublist]
+
+def preprocess_trace(trace : Trace, 
+                     successor_changes : list[tuple[datetime, str, str]],
+                     process_responsibility : bool,
+                     verbose : bool = False):
+
+    trace_events = flatten(trace.events)
+
+    keys = get_keys(trace)
+    membership, readonly, stable, ideal, responsibility = process_intervals(trace, successor_changes, keys, process_responsibility, verbose)
+
+    filtered = filter(
+        lambda e: not (e.action_type == ActionType.FAIL and isinstance(e, EndEvent)), trace_events
+    )
+    all_events = list(filtered) + membership + readonly + stable + ideal + responsibility
+    all_events.sort(key=lambda x: (x.get_time(), isinstance(x, EndEvent), x.to_log_entry()))
+
+    return all_events
+
+def write_processed_log(events, output_path, verbose = False):
+
+    with open(output_path, "w") as f:
+        for i, event in enumerate(events):
+            f.write(event.to_log_entry() + "\n")
+            if verbose and (len(events) // 10 != 0 and (i + 1) % (len(events) // 10) == 0):
+                print(f"\tWrote {i + 1}/{len(events)} events...")
+
+
+
+def preprocess_log(log_path: str, 
+                   output_path: str, 
+                   successors_path: str | None = None,
+                   num_lines: int | None = None,
+                   process_responsibility: bool = False,
+                   verbose: bool = True) -> None:
+
+    if verbose:
+        print(f"\nUsing log file: {log_path}")
+        print(f"Using successors file: {successors_path}\n" if successors_path else "Not using a successors file\n")
+
+    trace, successor_changes = load_trace_data(log_path, successors_path, num_lines)
+
+    if verbose:
+        print(f"Preprocessing {trace.get_length()} events")
+
+
+    complete_events = preprocess_trace(trace, successor_changes, process_responsibility, verbose)
+
+    if verbose:
+        print(f"\nPreprocessing generated {len(complete_events)} events")
+        print(f"Writing {len(complete_events)} events to {output_path}:")
+
+    write_processed_log(complete_events, output_path, verbose)
+
+    if verbose:
+        print(f"Wrote {len(complete_events)} events to {output_path}")
+
+
+def preprocess_log_from_dir(directory: str,
+                            output_path: str, 
+                            num_lines: int | None = None,
+                            process_responsibility: bool = False,
+                            verbose: bool = False) -> None:
+
+    log_path, successors_path = get_log_files(None, None, directory, verbose)
+    preprocess_log(log_path, output_path, successors_path, num_lines, process_responsibility, verbose)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Preprocess a chord log file to add regimen and state information.")
     parser.add_argument("-f", "--file", type=file_path, help="Path to the chord log file")
     parser.add_argument("-s", "--successors", type=file_path, help="Path to the chord successors file")
     parser.add_argument("-d", "--directory", type=dir_path, help="Path to the directory with log and successors file")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to destination output")
+
     parser.add_argument("-n", "--num-lines", type=int, default=None, 
                         help="Maximum number of lines to process (default: all)")
 
-    args = parser.parse_args()
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
+
+    parser.add_argument("-r", "--responsibility", action="store_true", help="Add responsibility actions to log")
+
+    return parser.parse_args()
 
 
-    if args.directory:
-        if args.file:
-            print("Warning: \"--file\" overrides log file from \"--directory\"")
-        else:
-            args.file = find_log_file(args.directory)
-        if args.successors:
-            print("Warning: \"--successors\" overrides successor file from \"--directory\"")
-        else:
-            args.successors = find_successor_file(args.directory)
+def main():
+    args = parse_args()
 
+    log_path, successors_path = get_log_files(log_path=args.file,
+                                              successors_path=args.successors,
+                                              dir_path=args.directory,
+                                              verbose=args.verbose)
+        
+    preprocess_log(log_path, 
+                   args.output, 
+                   successors_path=successors_path,
+                   num_lines=args.num_lines,
+                   process_responsibility=args.responsibility,
+                   verbose=args.verbose)
 
-    if not args.file:
-        parser.error("The path to the chord log file \"--file\" must be specified if \"--directory\" is not used.")
-
-
-    print(f"\nUsing log file: {args.file}")
-
-    if args.successors:
-        print(f"Using successors file: {args.successors}\n")
-    else:
-        print(f"Not using a successors file\n")
-
-    trace = parse_trace_file(args.file, args.num_lines, True)
-
-    if args.successors:
-        successor_changes = parse_successors(args.successors)
-    else:
-        successor_changes = []
-
-    trace_events = flatten(trace.events)
-    print(f"Preprocessing {len(trace_events)} events")
-
-    keys = get_keys(trace)
-    membership_intervals, \
-    readonly_intervals, \
-    stable_intervals, \
-    ideal_intervals, \
-    responsibility_intervals =  process(trace, successor_changes, keys)
-
-
-    #NOTE: filter fail end events to avoid counting them twice
-    filtered_events = list(filter(
-        lambda event: not (event.action_type == ActionType.FAIL and isinstance(event, EndEvent)),
-        trace_events)
-    )
-    
-
-    complete_events = filtered_events + membership_intervals \
-                        + readonly_intervals + stable_intervals \
-                        + ideal_intervals + responsibility_intervals
-
-    complete_events.sort(key=lambda x: (x.get_time(), isinstance(x, EndEvent), x.to_log_entry()))
-
-    print(f"\nPreprocessing generated {len(complete_events)} events")
-    print(f"Writing {len(complete_events)} events to {args.output}:")
-
-    with open(args.output, "w") as output_file:
-        for (i, event) in enumerate(complete_events):
-
-            log_entry = event.to_log_entry()
-
-            output_file.write(log_entry + "\n")
-    
-            step = len(complete_events) // 10
-            if step != 0 and (i + 1) % step  == 0:
-                print(f"\tWrote {i + 1}/{len(complete_events)} events...")
-
-    print(f"Wrote {len(complete_events)} events to {args.output}")
-
-def flatten(lst: list[list[T]]) -> list[T]:
-    return [item for sublist in lst for item in sublist]
 
 if __name__ == "__main__":
     main()
