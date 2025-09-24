@@ -1,3 +1,5 @@
+DEBUG = False
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
@@ -5,9 +7,9 @@ from typing import Any, TypeAlias
 from datetime import datetime
 import sys
 
-ActionCollection : TypeAlias = dict["ActionType", list["ActionValue"]]
-VarCollection : TypeAlias = dict[tuple["ActionType", int], list[str]]
+# get_possible_values and get_possible_actions are not used, as well as forallquantifier and existsquantifier
 
+VarCollection : TypeAlias = dict[tuple["ActionType", int], list[str]]
 
 class ActionType(Enum):
     LOOKUP = "LOOKUP"
@@ -24,495 +26,404 @@ class ActionType(Enum):
 
     @classmethod
     def has_value(cls, value):
-        return value.upper() in cls._value2member_map_ 
-
-    @classmethod
-    def _missing_(cls, value):
-        if not isinstance(value, str):
-            return None
-
-        value = value.upper()
-        for member in cls:
-            if member.value == value:
-                return member
-
-        return None
+        return value in cls._value2member_map_
 
 class ActionValue():
-    def __init__(self, action_type: ActionType, id : str, interval: "IntervalValue", inputs : list[str], outputs : list[str]):
+    def __init__(self, action_type: ActionType, interval_value: "IntervalValue", input_values: list[str], output_values: list[str]):
         self.action_type = action_type
-        self.id = id
-        self.interval = interval
-        self.inputs = inputs 
-        self.outputs = outputs 
+        self.interval_value = interval_value
+        self.input_values = input_values
+        self.output_values = output_values
 
-    def get_type(self) -> ActionType:
+    def get_action_type(self) -> ActionType:
         return self.action_type
 
-    def get_id(self) -> str:
-        return self.id
+    def get_interval_value(self) -> "IntervalValue":
+        return self.interval_value
 
-    def get_interval(self) -> "IntervalValue":
-        return self.interval
+    def get_input_values(self) -> list[str]:
+        return self.input_values
 
-    def get_inputs(self) -> list[str]:
-        return self.inputs
+    def get_output_values(self) -> list[str]:
+        return self.output_values
+        self.output_values = output_values
 
-    def get_outputs(self) -> list[str]:
-        return self.outputs
-
-
-    def complete_end(self, outputs : list[str], end_position : int) -> bool:
-        if self.outputs != [] or self.interval.end != float("inf"):
+    # Completes the action's end time point and sets the output values if missing
+    def complete_end(self, interval_end: int, output_values: list[str]) -> bool:
+        if self.interval_value.end != float("inf") or self.output_values != []:
             return False
         else:
-            self.outputs = outputs
-            self.interval.complete_end(end_position)
+            self.interval_value.set_end(interval_end)
+            self.output_values = output_values
             return True
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ActionValue):
-            return False
-        return (self.action_type == other.action_type and 
-            self.id == other.id and 
-            self.interval == other.interval and 
-            self.inputs == other.inputs and 
-            self.outputs == other.outputs)
+        return (isinstance(other, ActionValue) and
+            self.action_type == other.action_type and
+            self.interval_value == other.interval_value and
+            self.input_values == other.input_values and
+            self.output_values == other.output_values)
 
-    def __repr__(self):
-        return f"ActionValue({self.action_type}, {self.interval}, {self.inputs}, {self.outputs})"
+    def __repr__(self) -> str:
+        # return f"ActionValue({self.action_type}, {self.interval_value}, {self.input_values}, {self.output_values})"
+        return f"({self.interval_value.begin, self.interval_value.end}, ({', '.join(self.input_values)}), ({', '.join(self.output_values)}))"
 
 class Event(ABC):
     @abstractmethod
-    def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
+    def __init__(self, action_type: ActionType, id: str | None, values: str | list[str], time: datetime | None):
         self.action_type = action_type
-        self.values = values if isinstance(values, list) else [values]
         self.id = id
+        self.values = values if isinstance(values, list) else [values]
         self.time = time
+    
+    def get_action_type(self) -> ActionType:
+        return self.action_type
+    
+    def get_id(self) -> str:
+        assert self.id is not None, f"Event.get_id(): Event id is None for {self}"
+        return self.id
 
     def get_time(self) -> datetime:
         assert self.time is not None, f"Event.get_time(): Event time is None for {self}"
         return self.time
 
-    def get_id(self) -> str:
-        assert self.id is not None, f""
-        return self.id
-
-    def get_type(self) -> ActionType:
-        return self.action_type
-
-    def matches(self, other) -> bool:
+    def matches(self, other: object) -> bool:
         if type(self) != type(other):
             return False
         else:
             return self.action_type == other.action_type and self.values == other.values
     
-    def to_log_entry(self) -> str:
+    def entry_str(self) -> str:
         time_str = self.get_time().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        action_type = self.log_event_type()
-
+        action_type_str = self.action_type_str()
         id_str = self.get_id()
         values_str = ', '.join(self.values)
-        return f"{time_str}, {action_type}, {id_str}, {values_str}"
+        return f"{time_str}, {action_type_str}, {id_str}, {values_str}"
 
     @abstractmethod
-    def log_event_type(self) -> str:
+    def action_type_str(self) -> str:
         pass
 
+    def __hash__(self) -> int:
+        return hash((self.action_type, self.id, tuple(self.values), self.time))
+
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return (self.action_type == other.action_type and 
+        return (isinstance(other, type(self)) and
+            self.action_type == other.action_type and 
             self.values == other.values and 
             self.id == other.id and 
             self.time == other.time)
 
     def __repr__(self):
-        return f"({self.time}, {self.id}, {self.action_type}, {self.values})"
+        # return f"({self.time}, {self.id}, {self.action_type}, {self.values})"
+        return f"⟨{self.action_type.name.lower()}⟩_{self.id} ({', '.join(self.values)})"
 
 class BeginEvent(Event):
-    def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
-        super().__init__(action_type, values, id, time)
+    def __init__(self, action_type, id, values, time):
+        super().__init__(action_type, id, values, time)
 
-    def get_log_type(self) -> str:
-        return self.get_type().value
+    def action_type_str(self) -> str:
+        return self.get_action_type().value
 
-    def log_event_type(self) -> str:
-        return self.get_type().value
-
-    def __repr__(self):
-        return f"BeginEvent{super().__repr__()}"
+    def __repr__(self) -> str:
+        # return f"BeginEvent{super().__repr__()}"
+        return f"B {super().__repr__()}"
 
 class EndEvent(Event):
-    def __init__(self, action_type : ActionType, values : str | list[str], id : str | None, time : datetime | None):
-        super().__init__(action_type, values, id, time)
+    def __init__(self, action_type, id, values, time):
+        super().__init__(action_type, id, values, time)
 
-    def log_event_type(self) -> str:
+    def action_type_str(self) -> str:
         if self.action_type in (ActionType.STORE, ActionType.LOOKUP, ActionType.LEAVE, ActionType.JOIN):
-            return "Reply" + self.get_type().value
+            return "Reply" + self.get_action_type().value
         else:
-            return "End" + self.get_type().value
+            return "End" + self.get_action_type().value
 
-    def __repr__(self):
-        return f"EndEvent{super().__repr__()}"
+    def __repr__(self) -> str:
+        # return f"EndEvent{super().__repr__()}"
+        return f"E {super().__repr__()}"
 
 class Trace:
-    def __init__(self, events : list[list[Event]] | None = None, 
-                 actions : ActionCollection | None = None, 
-                 inputs : VarCollection | None = None,
-                 outputs : VarCollection | None = None):
+    def __init__(self, events: list[set[Event]] | None = None,
+        actions: dict["ActionType", list["ActionValue"]] | None = None, 
+        input_values: VarCollection | None = None,
+        output_values: VarCollection | None = None):
 
         if events is None:
             events = []
+        self.events = events
         if actions is None:
             actions = defaultdict(list)
-        if inputs is None:
-            inputs = defaultdict(list)
-        if outputs is None:
-            outputs = defaultdict(list)
-         
-        self.events = events
         self.actions = actions
 
-        #NOTE: inputs and outputs used only for variable quantifiers, which are currently not used
-        self.inputs = inputs
-        self.outputs = outputs
+        #NOTE: input and output values used only for variable quantifiers, which are currently not used
+        if input_values is None:
+            input_values = defaultdict(list) # { (LOOKUP, 63) : list[str] }
+        self.input_values = input_values
+        if output_values is None:
+            output_values = defaultdict(list)
+        self.output_values = output_values
 
     def __len__(self) -> int:
         return len(self.events)
 
-    # Returns the number of events in the trace
+    # Returns the total number of events in the trace
     def get_length(self) -> int:
-        return sum(len(event_list) for event_list in self.events)
+        return sum(len(event_set) for event_set in self.events)
 
-    def insert_event(self, event : Event) -> int:
-        if len(self.events) == 0 or self.events[-1][0].get_time() < event.get_time():
-            self.events.append([event])
+    def insert_event(self, event: Event) -> int:
+        if len(self.events) == 0 or next(iter(self.events[-1])).get_time() < event.get_time():
+            self.events.append({event}) # new time point
         else:
-            assert self.events[-1][0].get_time() == event.get_time(), f"Trace events not ordered: {self.events[-1][0].get_time()} < {event.get_time()}\nlast event: {self.events[-1][0]}\n inserting: {event}"
-
-            self.events[-1].append(event)
-
+            assert next(iter(self.events[-1])).get_time() == event.get_time(), f"Trace events not ordered: {next(iter(self.events[-1])).get_time()} > {event.get_time()}"
+            self.events[-1].add(event) # same time point
         return len(self.events) - 1
 
-    # def insert_action(self, action_type : ActionType, action_value: ActionValue):
-    def insert_begin_event(self,  action_type : ActionType, 
-                           inputs: list[str], id : str, date : datetime) -> ActionValue:
-
-        event = BeginEvent(action_type, inputs, id, date)
-        
-        begin_position = self.insert_event(event)
-        interval_value = IntervalValue(begin_position)
-
-        for (i, value) in enumerate(inputs):
-            self.insert_input(action_type, i, value)
-
-        action_value = ActionValue(action_type, id, interval_value, inputs, [])
-
+    def insert_begin_event(self, action_type: ActionType, id: str, input_values: list[str], time: datetime) -> ActionValue:
+        # Insert event into trace
+        event = BeginEvent(action_type, id, input_values, time)
+        begin_timepoint = self.insert_event(event)
+        # Insert action occurrence
+        interval_value = IntervalValue(begin_timepoint)
+        action_value = ActionValue(action_type, interval_value, input_values, [])
         self.actions.setdefault(action_type, []).append(action_value)
-
+        # Insert input values
+        for (i, value) in enumerate(input_values):
+            self.input_values[(action_type, i)].append(value)
         return action_value
 
+    def insert_end_event(self, action_value: ActionValue, id: str, output_values: list[str], time: datetime) -> bool:
+        # Insert event into trace
+        event = EndEvent(action_value.get_action_type(), id, output_values, time)
+        end_timepoint = self.insert_event(event)
+        # Insert output values
+        for (i, value) in enumerate(output_values):
+            self.output_values[(action_value.get_action_type(), i)].append(value)
+        # Update action occurrence
+            return action_value.complete_end(end_timepoint, output_values)
 
-    def insert_end_event(self, action : ActionValue, 
-                         outputs: list[str], date : datetime) -> bool:
+    def get_input_values(self, action_type: ActionType, index: int) -> list[str]:
+        return self.input_values[(action_type, index)]
 
-        event = EndEvent(action.get_type(), outputs, action.get_id(), date)
-        
-        end_position = self.insert_event(event)
+    def get_output_values(self, action_type: ActionType, index: int) -> list[str]:
+        return self.output_values[(action_type, index)]
 
-        for (i, value) in enumerate(outputs):
-            self.insert_output(action.get_type(), i, value)
-
-        return action.complete_end(outputs, end_position)
-
-
-    def insert_input(self, action_type : ActionType, index : int, input_Value: str):
-        self.insert_value(self.inputs, action_type, index, input_Value)
-
-    def insert_output(self, action_type : ActionType, index : int, output_value: str):
-        self.insert_value(self.outputs, action_type, index, output_value)
-
-    def insert_value(self, vars : VarCollection, action_type : ActionType, index : int, value: str): 
-        vars[(action_type, index)].append(value)
-
-    def get_inputs(self,  action_type : ActionType, index : int) -> list[str]:
-        return self.inputs[(action_type, index)]
-
-    def get_outputs(self,  action_type : ActionType, index : int) -> list[str]:
-        return self.outputs[(action_type, index)]
-
-    def findOcurrences(self,  action_type : ActionType) -> list[ActionValue]:
+    def find_occurrences(self, action_type: ActionType) -> list[ActionValue]:
         return self.actions[action_type]
 
-    # def get_actions(self, action_type : ActionType) -> list[tuple["IntervalValue", list[str], list[str]]]:
-    #     actions = []
-    #
-    #     intervals = self.intervals[action_type]
-    #
-    #     for interval in intervals:
-    #
-    #         for event in self.events[interval.begin]:
-    #             if isinstance(event, BeginEvent) and event.action_type == action_type:
-    #                 inputs = event.values
-    #                 outputs = []
-    #
-    #                 if interval.end != float("inf"):
-    #                     assert isinstance(interval.end, int), f"Interval end boundary should be an index of Trace.events: \"{interval.end}\""
-    #
-    #                     for end_event in self.events[interval.end]:
-    #                         if isinstance(end_event, EndEvent) and end_event.id == event.id:
-    #                             outputs = end_event.values
-    #                             break
-    #
-    #                 actions.append((interval, inputs, outputs))
-    #
-    #     return actions
-
-
-    def complete_event(self, event : Event, t : int) -> None | Event: 
+    def complete_event(self, event: Event, timepoint: int) -> None | Event: 
         assert event.id is None
-
-        if t < 0 or t >= len(self.events):
+        if timepoint < 0 or timepoint >= len(self.events):
             return None
-
-        for candidate in self.events[t]:
+        for candidate in self.events[timepoint]:
             if candidate.matches(event):
                 return candidate
         return None
 
-    def __repr__(self):
-        events = ""
-        for (i, event_list) in enumerate(self.events):
-            events += f"\nInstant {i}: "
-            for event in event_list:
-                events += f"\n\t{event}"
+    def __repr__(self) -> str:
+        events_str = ""
+        for (i, event_set) in enumerate(self.events):
+            events_str += f"\n {i}: {{ "
+            for event in event_set:
+                events_str += f"{event}"
+            events_str += " }"
+        
+        actions_str = ""
+        for (action_type, values) in self.actions.items():
+            actions_str += f"\n{action_type.name.lower()}:"
+            for value in values:
+                actions_str += f"\n{value}"
 
-        outputs = "\n".join([f"{action_type}: {values}" for action_type, values in self.outputs.items()])
-        inputs = "\n".join([f"{action_type}: {values}" for action_type, values in self.inputs.items()])
-        intervals = "\n".join([f"{action_type}: {values}" for action_type, values in self.actions.items()])
+        inputs_str = "\n".join([f"{action_type.name.lower()} {[i]}: {', '.join(values)}" for (action_type, i), values in self.input_values.items()])
+        outputs_str = "\n".join([f"{action_type.name.lower()} {[i]}: {', '.join(values)}" for (action_type, i), values in self.output_values.items()])
 
-        return f"Trace(Events: {events};\n\nInputs: {inputs};\n\nOutputs: {outputs};\n\nIntervals: {intervals})"
+        return f"\nTrace(\nEvents:{events_str}\n\nAction Occurrences:{actions_str}\n\nInput Values:\n{inputs_str}\n\nOutput Values:\n{outputs_str})"
 
 class Formula(ABC):
     @abstractmethod
-    def evaluate(self, trace : Trace, store : dict[str, str], interval_store : "dict[str, IntervalValue]") -> Any:
+    def evaluate(self, trace: Trace, store: dict[str, str], interval_store: "dict[str, IntervalValue]") -> Any:
         pass
 
-    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            var : "Var") -> list[str]:
+    def get_possible_values(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], var: "Variable") -> list[str]:
         return []
 
-
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
+    def get_possible_actions(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], interval: "Interval") -> list["Action"]:
         return []
 
-
-class Var(Formula):
-    def __init__(self, label):
+class Variable(Formula):
+    def __init__(self, label: str):
         self.label = label
 
-    def evaluate(self, _trace : Trace, store, _interval_store):
+    def evaluate(self, _trace, store, _interval_store) -> str:
         if self.label not in store:
             raise ValueError(f"Variable {self.label} not found in store")
-
         return store[self.label]
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, Var) and self.label == other.label
+        return (isinstance(other, Variable) and
+            self.label == other.label)
 
-    def __repr__(self):
-        return f"Var({self.label})"
-
+    def __repr__(self) -> str:
+        # return f"Variable({self.label})"
+        return f"{self.label}"
 
 class IntervalValue(Formula):
-    def __init__(self, begin : int, end : int | None = None): 
+    def __init__(self, begin: int, end: int | None = None):
         self.begin = begin
-        
         if end is None:
             self.end = float("inf")
         else: 
             self.end = end
-   
-    def complete_end(self, end : int) -> bool:
+
+    def set_end(self, end: int) -> bool:
         if self.end != float("inf"):
             return False
         else:
             self.end = end
             return True
 
-    def set_begin(self, begin : int):
-        self.begin = begin
-
-    def evaluate(self, _trace, _store, _interval_store):
+    def evaluate(self, _trace, _store, _interval_store) -> "IntervalValue":
         return self
 
     def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, IntervalValue)
-            and self.begin == other.begin
-            and self.end == other.end
-        )
+        return (isinstance(other, IntervalValue) and
+            self.begin == other.begin and
+            self.end == other.end)
 
-    def __repr__(self):
-        return f"({self.begin}, {self.end})"
+    def __repr__(self) -> str:
+        return f"IntervalValue({self.begin}, {self.end})"
 
 class Interval(Formula):
-    def __init__(self, label):
+    def __init__(self, label: str):
         self.label = label
 
-    def evaluate(self, _trace : Trace, _store, interval_store) -> IntervalValue:
+    def evaluate(self, _trace, _store, interval_store) -> IntervalValue:
         if self.label not in interval_store:
             raise ValueError(f"Interval {self.label} not found in interval store")
         return interval_store[self.label]
 
     def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, Interval)
-            and self.label == other.label
-        )
+        return (isinstance(other, Interval) and
+            self.label == other.label)
 
-    def __repr__(self):
-        return f"Interval({self.label})"
+    def __repr__(self) -> str:
+        # return f"Interval({self.label})"
+        return f"{self.label}"
 
 class UnaryExpr(Formula, ABC):
     @abstractmethod
-    def __init__(self, expression):
+    def __init__(self, expression: Formula):
         self.expression = expression
 
-    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
-                            target_var : Var) -> list[str]:
-        return self.expression.get_possible_values(trace, store, interval_store, target_var)
+    def get_possible_values(self, trace, store, interval_store, variable) -> list[str]:
+        return self.expression.get_possible_values(trace, store, interval_store, variable)
 
-
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
+    def get_possible_actions(self, trace, store, interval_store, interval) -> list["Action"]:
         return self.expression.get_possible_actions(trace, store, interval_store, interval)
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, type(self)) and self.expression == other.expression
+        return (isinstance(other, type(self)) and
+            self.expression == other.expression)
 
 class Not(UnaryExpr):
-    def __init__(self, expr):
-        super().__init__(expr)
+    def __init__(self, expression):
+        super().__init__(expression)
 
-    def evaluate(self, trace : Trace, store, interval_store):
+    def evaluate(self, trace, store, interval_store) -> bool:
         result = self.expression.evaluate(trace, store, interval_store)
-        
         assert isinstance(result, bool), f"\"Not\" operator expected boolean result from {self.expression}, but got {result} of type {type(result)}"
-
         return not result
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"¬{self.expression}"
 
 class BinaryExpr(Formula, ABC):
     @abstractmethod
-    def __init__(self, left : Formula, right : Formula):
+    def __init__(self, left: Formula, right: Formula):
         self.left = left
         self.right = right
 
-    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
-                            target_var : Var) -> list[str]:
+    def get_possible_values(self, trace, store, interval_store, target_var: Variable) -> list[str]:
         possible_values = self.left.get_possible_values(trace, store, interval_store, target_var)
         possible_values.extend(self.right.get_possible_values(trace, store, interval_store, target_var))
         return possible_values
 
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
+    def get_possible_actions(self, trace, store, interval_store, interval) -> list["Action"]:
         possible_actions = self.left.get_possible_actions(trace, store, interval_store, interval)
         possible_actions.extend(self.right.get_possible_actions(trace, store, interval_store, interval))
         return possible_actions
 
     def __eq__(self, other: object) -> bool:
-        return (isinstance(other, type(self)) and 
-            self.left == other.left and 
+        return (isinstance(other, type(self)) and
+            self.left == other.left and
             self.right == other.right)
 
 class Equal(BinaryExpr):
     def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left =  self.left.evaluate(trace, store, interval_store) 
         right = self.right.evaluate(trace, store, interval_store)
-
         return left == right
 
-    def __repr__(self):
-        return f"({self.left} == {self.right})"
-
+    def __repr__(self) -> str:
+        return f"({self.left} = {self.right})"
 
 class Implies(BinaryExpr):
     def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
-        left = self.left.evaluate(trace, store, interval_store) 
+    def evaluate(self, trace, store, interval_store) -> bool:
+        left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
-
         return (not left) or right
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"({self.left} => {self.right})"
-
 
 class NAryExpr(Formula, ABC):
     @abstractmethod
-    def __init__(self, *expressions : Formula):
-        assert len(expressions) > 1, f"\"{self.__class__.__name__}\" requires at least two expressions, but got {len(expressions)}"
+    def __init__(self, *expressions: Formula):
         self.expressions = expressions
+        assert len(expressions) > 1, f"\"{self.__class__.__name__}\" requires at least two expressions, but got {len(expressions)}"
 
-
-    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
-                            target_var : Var) -> list[str]:
+    def get_possible_values(self, trace, store, interval_store, target_var) -> list[str]:
         possible_values = []
-
         for expression in self.expressions:
             possible_values.extend(expression.get_possible_values(trace, store, interval_store, target_var))
-
         return possible_values
 
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
-
+    def get_possible_actions(self, trace, store, interval_store, interval) -> list["Action"]:
         possible_actions = []
-
         for expression in self.expressions:
             possible_actions.extend(expression.get_possible_actions(trace, store, interval_store, interval))
-
         return possible_actions
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return self.expressions == other.expressions
-
+        return (isinstance(other, type(self)) and
+            self.expressions == other.expressions)
 
 class And(NAryExpr):
-    def __init__(self, *expressions : Formula):
+    def __init__(self, *expressions):
         super().__init__(*expressions)
-    
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+
+    def evaluate(self, trace, store, interval_store) -> bool:
         for expression in self.expressions:
             result = expression.evaluate(trace, store, interval_store)
-
             assert isinstance(result, bool), f"\"And\" operator expected boolean result from {expression}, but got {result} of type {type(result)}"
-            
             if not result:
                 return False
-
         return True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return " ∧ ".join(map(str, self.expressions))
 
 class Or(NAryExpr):
-    def __init__(self, *expressions : Formula):
+    def __init__(self, *expressions):
         super().__init__(*expressions)
-    
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+
+    def evaluate(self, trace, store, interval_store) -> bool:
         for expression in self.expressions:
             result = expression.evaluate(trace, store, interval_store)
             assert isinstance(result, bool), f"\"Or\" operator expected boolean result from {expression}, but got {result} of type {type(result)}"
@@ -520,36 +431,30 @@ class Or(NAryExpr):
                 return True
         return False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return " v ".join(map(str, self.expressions))
-
 
 class Quantifier(Formula, ABC):
     @abstractmethod
-    def __init__(self, vars : Var | list[Var], expression : Formula):
-        self.vars = vars if isinstance(vars, list) else [vars]
+    def __init__(self, variables: Variable | list[Variable], expression: Formula):
+        self.variables = variables if isinstance(variables, list) else [variables]
         self.expression = expression
 
-    def get_possible_values(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], var: Var) -> list[str]:
-        if var in self.vars:
+    def get_possible_values(self, trace, store, interval_store, var) -> list[str]:
+        if var in self.variables:
             return []
         else:
             return self.expression.get_possible_values(trace, store, interval_store, var)
 
-
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
+    def get_possible_actions(self, trace, store, interval_store, interval) -> list["Action"]:
         return self.expression.get_possible_actions(trace, store, interval_store, interval)
 
-    def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
-                        short_circuit_on : bool):
-        return self.evaluate_naively_recursive(trace, var_store, interval_store, short_circuit_on, 0)
+    def evaluate_naively(self, trace: Trace, store: dict[str, str], interval_store: dict[str, IntervalValue], short_circuit_on: bool) -> bool:
+        return self.evaluate_naively_recursive(trace, store, interval_store, short_circuit_on, 0)
 
+    def evaluate_naively_recursive(self, trace: Trace, store: dict[str, str], interval_store: dict[str, IntervalValue], short_circuit_on: bool, var_idx: int) -> bool:
 
-    def evaluate_naively_recursive(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
-                     short_circuit_on : bool, var_idx : int) -> bool:
-
-        if var_idx >= len(self.vars):
+        if var_idx >= len(self.variables):
             result =  self.expression.evaluate(trace, var_store, interval_store)
             # print(f"Base case Evaluating: {self.expr} with {var_store} -> {result}")
             return result
@@ -557,7 +462,7 @@ class Quantifier(Formula, ABC):
         else:
 
             #TODO: check if var is not bound in current store?
-            var = self.vars[var_idx]
+            var = self.variables[var_idx]
 
             possible_values = self.expression.get_possible_values(trace, var_store, interval_store, var)
     
@@ -591,196 +496,138 @@ class Quantifier(Formula, ABC):
                 return not short_circuit_on
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return self.vars == other.vars and self.expression == other.expression
-
+        return (isinstance(other, type(self)) and
+            self.vars == other.vars and
+            self.expression == other.expression)
 
 class Exists(Quantifier):
-    def __init__(self, vars, expr):
-        super().__init__(vars, expr)
-    
-    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
-        return self.evaluate_naively(trace, var_store, interval_store, True)
+    def __init__(self, variables, expression):
+        super().__init__(variables, expression)
 
-    def __repr__(self):
-        var_str = ", ".join(map(str, self.vars))
-        return f"∃({var_str}). ({self.expression})"
+    def evaluate(self, trace, store, interval_store) -> bool:
+        return self.evaluate_naively(trace, store, interval_store, True)
 
+    def __repr__(self) -> str:
+        variables_str = ", ".join(map(str, self.variables))
+        return f"∃({variables_str}). ({self.expression})"
 
 class ForAll(Quantifier):
-    def __init__(self, vars, expr):
-        super().__init__(vars, expr)
+    def __init__(self, variables, expression):
+        super().__init__(variables, expression)
 
-    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
-        return self.evaluate_naively(trace, var_store, interval_store, False)
+    def evaluate(self, trace, store, interval_store) -> bool: 
+        return self.evaluate_naively(trace, store, interval_store, False)
 
-    def __repr__(self):
-        var_str = ", ".join(map(str, self.vars))
-        return f"∀({var_str}). ({self.expression})"
-
+    def __repr__(self) -> str:
+        variables_str = ", ".join(map(str, self.variables))
+        return f"∀({variables_str}). ({self.expression})"
 
 class ActionQuantifier(Formula, ABC):
+
     @abstractmethod
-    def __init__(self, action : "Action", expression : Formula):
-        self.action = action
-        # self.vars = vars if isinstance(vars, list) else [vars]
-        self.expression = expression
-    
+    def __init__(self, action: "Action", expression: Formula):
         assert isinstance(action, Action), f"Expected Action, but got '{action}' of {type(action)}"
+        self.action = action
+        self.expression = expression
 
-    # def get_possible_values(self, trace: Trace, store: dict[str, str], interval_store: dict[str, "IntervalValue"], var: Var) -> list[str]:
-    #     if var in self.vars:
-    #         return []
-    #     else:
-    #         return self.expr.get_possible_values(trace, store, interval_store, var)
+    #def get_possible_values(self, trace, store, interval_store, var) -> list[str]:
+    #    if var in self.vars:
+    #        return []
+    #    else:
+    #        return self.expr.get_possible_values(trace, store, interval_store, var)
 
-
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
+    def get_possible_actions(self, trace, store, interval_store, interval) -> list["Action"]:
         return self.expression.get_possible_actions(trace, store, interval_store, interval)
 
+    def evaluate_naively(self, trace: Trace, store: dict[str, str], interval_store: dict[str, IntervalValue], short_circuit_on: bool) -> bool:
+        action = self.action
+        occurrences = trace.find_occurrences(action.get_action_type())
+        # For each occurrence of the action in the trace
+        for occurrence in occurrences:
+            interval_value = occurrence.interval_value
+            input_values = occurrence.input_values
+            output_values = occurrence.output_values
 
-    def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
-                        short_circuit_on : bool):
-
-            action = self.action
-            possible_actions = trace.findOcurrences(action.get_type())
-
-            for possible_action in possible_actions:
-                inputs = possible_action.inputs
-                outputs = possible_action.outputs
-                interval_value = possible_action.interval
-                
-                #TODO: Mismatched number of inputs and outputs between formula and trace action
-                if len(inputs) < len(action.input) or len(outputs) < len(action.output):
-                    print(f"Warning: Possible action {action} has more inputs or outputs than action in trace: {interval_value, inputs, outputs}", file=sys.stderr)
+            #TODO: Mismatched number of inputs and outputs between formula and trace action
+            if len(input_values) < len(action.inputs) or len(output_values) < len(action.outputs):
+                print(f"Warning: Occurrence {occurrence} has less input or output values than action in formula: {action}", file=sys.stderr)
+                continue
+            # New domain variable environment
+            new_store = store.copy()
+            for (variable, value) in zip(action.inputs, input_values):
+                if isinstance(variable, Wildcard):
                     continue
-
-                new_interval_store = interval_store.copy()
-                new_interval_store[action.interval.label] = interval_value
-
-                new_var_store = var_store.copy()
-                for (var, value) in zip(action.input, inputs):
-                    if isinstance(var, Wildcard):
-                        continue
-                    assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
-                    new_var_store[var.label] = value
-
-                for (var, value) in zip(action.output, outputs):
-                    if isinstance(var, Wildcard):
-                        continue
-                    assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
-                    new_var_store[var.label] = value
-
-
-                result = self.expression.evaluate(trace, new_var_store, new_interval_store)
-                if result == short_circuit_on:
-                    return short_circuit_on
-            
-            return not short_circuit_on
-
-    # def evaluate_naively(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue],
-    #                     short_circuit_on : bool):
-    #
-    #         action = self.action
-    #         possible_actions = trace.get_actions(action.get_type())
-    #
-    #         for (interval_value, inputs, outputs) in possible_actions:
-    #
-    #             #TODO: Mismatched number of inputs and outputs between formula and trace action
-    #             if len(inputs) < len(action.input) or len(outputs) < len(action.output):
-    #                 print(f"Warning: Possible action {action} has more inputs or outputs than action in trace: {interval_value, inputs, outputs}", file=sys.stderr)
-    #                 continue
-    #
-    #             new_interval_store = interval_store.copy()
-    #             new_interval_store[action.interval.label] = interval_value
-    #
-    #             new_var_store = var_store.copy()
-    #             for (var, value) in zip(action.input, inputs):
-    #                 if isinstance(var, Wildcard):
-    #                     continue
-    #                 assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
-    #                 new_var_store[var.label] = value
-    #
-    #             for (var, value) in zip(action.output, outputs):
-    #                 if isinstance(var, Wildcard):
-    #                     continue
-    #                 assert var.label not in new_var_store, f"Variable {var.label} is already bound to: {new_var_store[var.label]}"
-    #                 new_var_store[var.label] = value
-    #
-    #
-    #             result = self.expression.evaluate(trace, new_var_store, new_interval_store)
-    #             if result == short_circuit_on:
-    #                 return short_circuit_on
-    #
-    #         return not short_circuit_on
+                assert variable.label not in new_store, f"Variable {variable.label} is already bound to: {new_store[variable.label]}"
+                new_store[variable.label] = value
+            for (variable, value) in zip(action.outputs, output_values):
+                if isinstance(variable, Wildcard):
+                    continue
+                assert variable.label not in new_store, f"Variable {variable.label} is already bound to: {new_store[variable.label]}"
+                new_store[variable.label] = value
+            # New interval variable environment
+            new_interval_store = interval_store.copy()
+            new_interval_store[action.interval.label] = interval_value
+            # Evaluate the inner expression
+            DEBUG and print(f"{new_store = }, {new_interval_store = }")
+            result = self.expression.evaluate(trace, new_store, new_interval_store)
+            if result == short_circuit_on:
+                return short_circuit_on
+        return not short_circuit_on
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return self.action == other.action and self.expression == other.expression
-
+        return (isinstance(other, type(self)) and
+            self.action == other.action and
+            self.expression == other.expression)
 
 class ExistsAction(ActionQuantifier):
-    def __init__(self, action : "Action", expression : Formula):
+    def __init__(self, action, expression):
         super().__init__(action, expression)
     
-    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
-        return self.evaluate_naively(trace, var_store, interval_store, True)
+    def evaluate(self, trace, store, interval_store) -> bool: 
+        return self.evaluate_naively(trace, store, interval_store, True)
 
-    def __repr__(self):
-        return f"∃({self.action}). ({self.expression})"
+    def __repr__(self) -> str:
+        return f"∃ {self.action} . {self.expression}"
 
 class ForAllAction(ActionQuantifier):
-    def __init__(self, action : "Action", expression : Formula):
+    def __init__(self, action, expression):
         super().__init__(action, expression)
 
-    def evaluate(self, trace : Trace, var_store : dict[str, str], interval_store : dict[str, IntervalValue]): 
-        return self.evaluate_naively(trace, var_store, interval_store, False)
+    def evaluate(self, trace, store, interval_store) -> bool: 
+        return self.evaluate_naively(trace, store, interval_store, False)
 
-    def __repr__(self):
-        return f"∀({self.action}). ({self.expression})"
+    def __repr__(self) -> str:
+        return f"∀ {self.action} . {self.expression}"
 
 class Action(Formula):
-    def __init__(self, action_type: ActionType, interval : Interval, inputs : Var | list[Var], outputs : Var | list[Var]):
+    def __init__(self, action_type: ActionType, interval: Interval, inputs: Variable | list[Variable], outputs: Variable | list[Variable]):
         self.action_type = action_type
         self.interval = interval
-        self.input = inputs if isinstance(inputs, list) else [inputs]
-        self.output = outputs if isinstance(outputs, list) else [outputs]
+        self.inputs = inputs if isinstance(inputs, list) else [inputs]
+        self.outputs = outputs if isinstance(outputs, list) else [outputs]
+        assert isinstance(interval, Interval), f"Expected Interval, but got '{interval}' of {type(interval)}, during initialization of Action {self}"
+        for variable in self.inputs + self.outputs:
+            assert isinstance(variable, Variable), f"Expected Variable, but got '{variable}' of {type(variable)}, during initialization of Action {self}"
 
-        for var in self.input + self.output:
-            assert isinstance(var, Var), f"Expected Var, but got '{var}' of {type(var)}. During initialization of Action {self}."
-
-
-        assert isinstance(interval, Interval), f"Expected Interval, but got '{interval}' of {type(interval)}. During initialization of Action {self}."
-    
-    def get_type(self) -> ActionType:
+    def get_action_type(self) -> ActionType:
         return self.action_type
 
-    def evaluate(self, 
-                 trace : Trace,
-                 var_store : dict[str, str],
-                 interval_store : dict[str, IntervalValue]) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
+        eval_interval = self.interval.evaluate(trace, store, interval_store)
+        eval_inputs = [variable.evaluate(trace, store, interval_store) for variable in self.inputs]
+        eval_outputs = [variable.evaluate(trace, store, interval_store) for variable in self.outputs]
 
-        action_interval = self.interval.evaluate(trace, var_store, interval_store)
-
-        bound_input = [x.evaluate(trace, var_store, interval_store) for x in self.input]
-        bound_output = [x.evaluate(trace, var_store, interval_store) for x in self.output]
-
-        begin_event = BeginEvent(self.action_type, bound_input, None, None)
-        end_event = EndEvent(self.action_type, bound_output, None, None)
-
-        completed_begin_event = trace.complete_event(begin_event, action_interval.begin)
-
+        # Create begin and end events with missing id and time, to be completed by the trace
+        begin_event = BeginEvent(self.action_type, None, eval_inputs, None)
+        completed_begin_event = trace.complete_event(begin_event, eval_interval.begin)
         if completed_begin_event is None:
             return False
-
+        end_event = EndEvent(self.action_type, None, eval_outputs, None)
         completed_end_event = trace.complete_event(end_event, action_interval.end)
 
         # NOTE:
         # Handle infinite intervals
-        # end_event is not None iff t2 = "inf"
+        # end_event is not None iff t_e = "inf"
         if completed_end_event is None:
             return action_interval.end == float("inf")
             
@@ -791,169 +638,155 @@ class Action(Formula):
     
         return (completed_end_event is not None) and completed_end_event.id == completed_begin_event.id
 
-    def get_possible_values(self, trace : Trace, store : dict[str, str], interval_store : dict[str, IntervalValue],
-                            var : Var) -> list[str]:
+    def get_possible_values(self, trace, store, interval_store, var) -> list[str]:
         possible_values = []
-        # print(f"{var = } {self.input = } {self.output = } ")
-        # print(f"{ trace = }")
-
-        for (i, action_var) in enumerate(self.input):
-            if action_var.label == var.label:
+        for (i, variable) in enumerate(self.inputs):
+            if variable.label == var.label:
                 possible_values.extend(trace.get_inputs(self.action_type, i))
-
-        for (i, action_var) in enumerate(self.output):
-            if action_var.label == var.label:
+        for (i, variable) in enumerate(self.outputs):
+            if variable.label == var.label:
                 possible_values.extend(trace.get_outputs(self.action_type, i))
-
         return possible_values
 
-    def get_possible_actions(self, trace : Trace, store : dict[str, str], interval_store : dict[str, "IntervalValue"], 
-                            interval : "Interval") -> list["Action"]:
-
+    def get_possible_actions(self, trace, store, interval_store, interval) -> list["Action"]:
         if self.interval.label == interval.label:
             return [self]
         else:
             return []
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Action):
-            return False
-        return (self.action_type == other.action_type and 
+        return (isinstance(other, Action) and
+            self.action_type == other.action_type and 
             self.interval == other.interval and 
-            self.input == other.input and 
-            self.output == other.output)
+            self.inputs == other.inputs and 
+            self.outputs == other.outputs)
 
-    def __repr__(self):
-        type_str = self.action_type.name.lower()
-        input_str = ", ".join(map(str, self.input))
-        output_str = ", ".join(map(str, self.output))
-
-        return f"{type_str}[{self.interval}] ({input_str}) -> ({output_str})"
-
+    def __repr__(self) -> str:
+        action_type_str = self.action_type.name.lower()
+        inputs_str = ", ".join(map(str, self.inputs))
+        outputs_str = ", ".join(map(str, self.outputs))
+        return f"{action_type_str}[{self.interval}] ({inputs_str}) -> ({outputs_str})"
 
 class IntervalPredicate(Formula, ABC):
     @abstractmethod
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left: Interval, right: Interval):
         assert isinstance(left, Interval), f"Expected Interval, but got '{left}' of {type(left)}"
         assert isinstance(right, Interval), f"Expected Interval, but got '{right}' of {type(right)}"
-
         self.left = left
         self.right = right
     
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, type(self)):
-            return False
-        return (self.left == other.left and 
-                self.right == other.right)
-
+        return (isinstance(other, type(self)) and
+            self.left == other.left and 
+            self.right == other.right)
 
 class Before(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return left.end < right.begin
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Before({self.left}, {self.right})"
 
 class Meets(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return left.end == right.begin
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Meets({self.left}, {self.right})"
 
 class Overlaps(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return left.begin < right.begin < left.end < right.end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Overlaps({self.left}, {self.right})"
 
 class Starts(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return left.begin == right.begin and left.end < right.end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Starts({self.left}, {self.right})"
 
 class During(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return right.begin < left.begin and left.end < right.end
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"During({self.left}, {self.right})"
 
 class Finishes(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return left.end == right.end and right.begin < left.begin
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Finishes({self.left}, {self.right})"
 
 class Equals(IntervalPredicate):
-    def __init__(self, left : Interval, right : Interval):
+    def __init__(self, left, right):
         super().__init__(left, right)
 
-    def evaluate(self, trace : Trace, store, interval_store) -> Any:
+    def evaluate(self, trace, store, interval_store) -> bool:
         left = self.left.evaluate(trace, store, interval_store)
         right = self.right.evaluate(trace, store, interval_store)
         return left == right
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Equals({self.left}, {self.right})"
 
 class Constant(Formula):
-    def __init__(self, label : str):
+    def __init__(self, label: str):
         self.label = label
     
-    def evaluate(self, _trace : Trace, _store, _interval_store) -> Any:
+    def evaluate(self, _trace, _store, _interval_store) -> str:
         return self.label
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, Constant) and self.label == other.label
+        return (isinstance(other, Constant) and
+            self.label == other.label)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Constant({self.label})"
 
-
-class Wildcard(Var):
+class Wildcard(Variable):
     def __init__(self):
         super().__init__("-")
 
-    def evaluate(self, _trace : Trace, _store, _interval_store) -> Any:
+    def evaluate(self, _trace, _store, _interval_store) -> bool:
         raise ValueError("Wildcard should not be evaluated directly")
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, Wildcard)
+        return False
 
-    def __repr__(self):
-        return f"Wildcard"
+    def __repr__(self) -> str:
+        return f"Wildcard({self.label})"
