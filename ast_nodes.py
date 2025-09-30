@@ -548,22 +548,37 @@ class ActionQuantifier(Formula, ABC):
             input_values = occurrence.input_values
             output_values = occurrence.output_values
 
-            #TODO: Mismatched number of inputs and outputs between formula and trace action
+            # TODO: Mismatched number of inputs and outputs between formula and trace action
             if len(input_values) < len(action.inputs) or len(output_values) < len(action.outputs):
                 print(f"Warning: Occurrence {occurrence} has less input or output values than action in formula: {action}", file=sys.stderr)
                 continue
+
             # New domain variable environment
+            skip_occurrence = False
             new_store = store.copy()
             for (variable, value) in zip(action.inputs, input_values):
                 if isinstance(variable, Wildcard):
                     continue
-                assert variable.label not in new_store, f"Variable {variable.label} is already bound to: {new_store[variable.label]}"
-                new_store[variable.label] = value
+                if variable.label in new_store:
+                    if new_store[variable.label] != value:
+                        skip_occurrence = True
+                        break
+                else:
+                    new_store[variable.label] = value
+            if skip_occurrence:
+                continue
             for (variable, value) in zip(action.outputs, output_values):
                 if isinstance(variable, Wildcard):
                     continue
-                assert variable.label not in new_store, f"Variable {variable.label} is already bound to: {new_store[variable.label]}"
-                new_store[variable.label] = value
+                if variable.label in new_store:
+                    if new_store[variable.label] != value:
+                        skip_occurrence = True
+                        break
+                else:
+                    new_store[variable.label] = value
+            if skip_occurrence:
+                continue
+
             # New interval variable environment
             new_interval_store = interval_store.copy()
             new_interval_store[action.interval.label] = interval_value
