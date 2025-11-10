@@ -1,0 +1,12 @@
+(and
+  (forall findnode f (- k) (- n)
+    (exists responsible r (n k) ()
+      (intersects f r)
+    )
+  )
+  (forall lookup l (- k) (n -)
+    (exists responsible r (n k) ()
+      (intersects l r)
+    )
+  )
+)

@@ -1,0 +1,10 @@
+(forall lookup l (- k) (- v)
+  (implies (not (v = 'no_value))
+    (exists store s (- k v) (-)
+      (and
+        (not (before l s))
+        (not (meets l s))
+      )
+    )
+  )
+)

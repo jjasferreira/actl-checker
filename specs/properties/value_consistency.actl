@@ -1,0 +1,17 @@
+(forall lookup l1 (- k) (- v1)
+	(forall lookup l2 (- k) (- v2)
+		(forall ideal i () ()
+			(forall readonly r () ()
+				(implies
+					(and  
+						(or (in l1 i) (equals l1 i))
+						(or (in l2 i) (equals l2 i))
+						(or (in l1 r) (equals l1 r))
+						(or (in l2 r) (equals l2 r))
+					)
+					(v1 = v2)
+				)
+			)
+		)
+	)
+)

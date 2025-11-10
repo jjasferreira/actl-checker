@@ -1,0 +1,24 @@
+(forall lookup l (- k) (- v)
+  	(implies
+		(exists ideal i () ()
+			(or (in l i) (equals l i))
+		)
+		(exists store s1 (- k v) (-)
+			(or
+				(intersects s1 l)
+				(and
+					(before s1 l)
+					(forall store s2 (- k -) (-)
+						(implies
+							(and 
+								(not (equals s1 s2))    
+								(before s2 l)
+							)
+							(not (before s1 s2))
+						)
+					)
+				)
+			)
+		)
+	)
+)

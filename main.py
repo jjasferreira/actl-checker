@@ -3,6 +3,7 @@ DEBUG = False
 import os
 import sys
 import argparse
+import time
 
 from ast_nodes import Formula
 from parse_formula import parse_formula
@@ -74,4 +75,8 @@ def main():
     print(f"{'-'*50}\nEvaluation:\n{result} - {result_str}\n{'-'*50}")
 
 if __name__ == "__main__":
+    start = time.perf_counter()
     main()
+    end = time.perf_counter()
+    if DEBUG:
+        print(f"Execution time: {end - start:.4f} seconds", file=sys.stderr)

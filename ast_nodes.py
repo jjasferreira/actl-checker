@@ -200,7 +200,7 @@ class Trace:
         for (i, value) in enumerate(output_values):
             self.output_values[(action_value.get_action_type(), i)].append(value)
         # Update action occurrence
-            return action_value.complete_end(end_timepoint, output_values)
+        return action_value.complete_end(end_timepoint, output_values)
 
     def get_input_values(self, action_type: ActionType, index: int) -> list[str]:
         return self.input_values[(action_type, index)]

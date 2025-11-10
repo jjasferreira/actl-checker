@@ -1,0 +1,19 @@
+(forall findnode f (- k) (- n)
+  (forall ideal ideal i () ()
+    (forall member m (k) ()
+      (implies
+        (and
+          (or
+            (in f m)
+            (equals f m)
+          )
+          (or
+            (in m i)
+            (equals m i)
+          )
+        )
+        (k = n)
+      )
+    )
+  )
+)

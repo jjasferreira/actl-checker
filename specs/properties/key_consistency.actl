@@ -1,0 +1,17 @@
+(forall findnode f1 (- k) (- n1)
+  (forall findnode f2 (- k) (- n2)
+    (forall ideal i () ()
+      (forall stable s () ()
+        (implies
+          (and  
+            (or (in f1 i) (equals f1 i))
+            (or (in f2 i) (equals f2 i))
+            (or (in f1 s) (equals f1 s))
+            (or (in f2 s) (equals f2 s))
+          )
+          (n1 = n2)
+        )
+      )
+    )
+  )
+)

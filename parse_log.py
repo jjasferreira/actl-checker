@@ -105,7 +105,7 @@ def parse_log(log: str, max_lines: int | None, ignore_non_operations: bool = Fal
             break
         try:
             parse_log_line(line, trace, ongoing_actions, ignore_non_operations)
-        except TraceParsingError as e:
+        except LogParsingError as e:
             print(e.display(line_number), file=sys.stderr)
             sys.exit(1)
         line_number += 1

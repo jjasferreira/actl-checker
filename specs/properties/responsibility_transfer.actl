@@ -1,0 +1,13 @@
+(forall leave l (n) ()
+  (forall findnode f (- -) (- n) 
+    (implies
+      (before l f)
+      (exists join j (n) ()
+        (and
+          (before l j)
+          (before j f)
+        )
+      )
+    )
+  )
+)
