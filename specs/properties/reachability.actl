@@ -1,5 +1,5 @@
 (forall findnode f (- k) (- n)
-  (forall ideal ideal i () ()
+  (forall ideal i () ()
     (forall member m (k) ()
       (implies
         (and
